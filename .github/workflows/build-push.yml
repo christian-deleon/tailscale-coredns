@@ -13,7 +13,6 @@ on:
 env:
   PLATFORMS: linux/amd64,linux/arm64
   GHCR_IMAGE_URL: ghcr.io/${{ github.actor }}/tailscale-coredns
-  TARGETARCH: ${{ env.TARGETARCH }}
 
 jobs:
   build:
