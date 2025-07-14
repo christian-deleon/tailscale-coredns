@@ -46,10 +46,8 @@ jobs:
       - name: Set image tags
         id: tags
         run: |
-          TAGS="${{ env.GHCR_IMAGE_URL }}:latest-${{ matrix.arch }}"
-          if [ "${{ github.ref_type }}" = "tag" ]; then
-            TAGS="$TAGS,${{ env.GHCR_IMAGE_URL }}:${{ github.ref_name }}-${{ matrix.arch }}"
-          fi
+          SHA="${{ github.sha }}"
+          TAGS="${{ env.GHCR_IMAGE_URL }}:$SHA-${{ matrix.arch }}"
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
 
       - name: Build and Push Image
@@ -79,9 +77,10 @@ jobs:
           if [ "${{ github.ref_type }}" = "tag" ]; then
             TAGS="$TAGS ${{ github.ref_name }}"
           fi
+          SHA="${{ github.sha }}"
           for TAG in $TAGS; do
             docker manifest create ${{ env.GHCR_IMAGE_URL }}:$TAG \
-              ${{ env.GHCR_IMAGE_URL }}:$TAG-amd64 \
-              ${{ env.GHCR_IMAGE_URL }}:$TAG-arm64
+              ${{ env.GHCR_IMAGE_URL }}:$SHA-amd64 \
+              ${{ env.GHCR_IMAGE_URL }}:$SHA-arm64
             docker manifest push ${{ env.GHCR_IMAGE_URL }}:$TAG
           done
