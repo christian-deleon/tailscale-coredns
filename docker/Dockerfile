@@ -39,10 +39,10 @@ RUN apk add --no-cache ca-certificates iptables ip6tables && \
 COPY --from=builder /coredns /coredns
 
 # Copy the entry script with executable permissions
-COPY --chmod=755 docker/entry.sh /entry.sh
+COPY --chmod=755 docker/scripts/entrypoint.sh /entrypoint.sh
 
 # Expose DNS port
 EXPOSE 53/udp
 
 # Set entrypoint
-ENTRYPOINT ["/entry.sh"]
+ENTRYPOINT ["/entrypoint.sh"]
