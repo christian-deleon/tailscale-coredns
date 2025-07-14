@@ -39,7 +39,7 @@ COPY --from=builder /coredns /coredns
 
 # Download and install Tailscale binaries
 ARG TAILSCALE_VERSION=1.84.0
-ARG TARGETARCH=amd64
+ARG TARGETARCH
 RUN wget https://pkgs.tailscale.com/stable/tailscale_${TAILSCALE_VERSION}_${TARGETARCH}.tgz && \
     tar xzf tailscale_${TAILSCALE_VERSION}_${TARGETARCH}.tgz --strip-components=1 \
     tailscale_${TAILSCALE_VERSION}_${TARGETARCH}/tailscale \
