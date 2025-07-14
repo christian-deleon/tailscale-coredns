@@ -3,6 +3,8 @@ package tailscale
 import (
 	"context"
 	"net"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -39,10 +41,23 @@ func New(domain string) (*Tailscale, error) {
 	return ts, nil
 }
 
-// periodicRefresh periodically updates the DNS records every 30 seconds.
+// getRefreshInterval returns the refresh interval in seconds from environment variable
+// TSC_REFRESH_INTERVAL, defaulting to 30 seconds if not set or invalid.
+func getRefreshInterval() time.Duration {
+	if intervalStr := os.Getenv("TSC_REFRESH_INTERVAL"); intervalStr != "" {
+		if interval, err := strconv.Atoi(intervalStr); err == nil && interval > 0 {
+			return time.Duration(interval) * time.Second
+		}
+		clog.Warningf("invalid TSC_REFRESH_INTERVAL value '%s', using default 30 seconds", intervalStr)
+	}
+	return 30 * time.Second
+}
+
+// periodicRefresh periodically updates the DNS records.
 // Using a ticker allows for better control and cleanup if needed in the future.
 func (t *Tailscale) periodicRefresh() {
-	ticker := time.NewTicker(30 * time.Second)
+	interval := getRefreshInterval()
+	ticker := time.NewTicker(interval)
 	for range ticker.C {
 		t.refresh()
 	}
