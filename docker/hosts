@@ -1,0 +1,7 @@
+# Sample hosts file for tailscale-coredns
+# Format: IP_ADDRESS HOSTNAME1 HOSTNAME2 ...
+
+# Example local services
+192.168.1.100    serviceA.mydomain.com
+192.168.1.101    serviceB.mydomain.com
+192.168.1.102    serviceC.mydomain.com

@@ -5,10 +5,13 @@ services:
       dockerfile: docker/Dockerfile
     volumes:
       - tailscale-state:/state
+      - ./hosts:/etc/hosts:ro # Optional: Mount hosts file
     environment:
       - TS_AUTHKEY=${TS_AUTHKEY}
       - TS_DOMAIN=${TS_DOMAIN}
       - TS_HOSTNAME=${TS_HOSTNAME}
+      - TS_HOSTS_FILE=${TS_HOSTS_FILE} # Optional: Path to hosts file
+      - TS_FORWARD_TO=${TS_FORWARD_TO} # Optional: Forward server
     cap_add:
       - NET_ADMIN
     devices:

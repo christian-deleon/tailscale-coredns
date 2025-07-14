@@ -22,13 +22,10 @@ RUN git clone https://github.com/coredns/coredns.git && \
 # Stage 2: Runtime image
 FROM alpine:latest
 
-# Install necessary packages
-RUN apk add --no-cache ca-certificates iptables ip6tables
-
 # Install necessary packages and download Tailscale
 ARG TAILSCALE_VERSION=1.84.0
 ARG TARGETARCH
-RUN apk add --no-cache ca-certificates iptables ip6tables && \
+RUN apk add --no-cache ca-certificates iptables ip6tables python3 py3-pip py3-jinja2 && \
     wget https://pkgs.tailscale.com/stable/tailscale_${TAILSCALE_VERSION}_${TARGETARCH}.tgz && \
     tar xzf tailscale_${TAILSCALE_VERSION}_${TARGETARCH}.tgz --strip-components=1 tailscale_${TAILSCALE_VERSION}_${TARGETARCH}/tailscale tailscale_${TAILSCALE_VERSION}_${TARGETARCH}/tailscaled && \
     mv tailscale /usr/bin/tailscale && \
@@ -38,8 +35,12 @@ RUN apk add --no-cache ca-certificates iptables ip6tables && \
 # Copy the built CoreDNS binary
 COPY --from=builder /coredns /coredns
 
-# Copy the entry script with executable permissions
+# Copy the entry script and template generation script
 COPY --chmod=755 docker/scripts/entrypoint.sh /entrypoint.sh
+COPY --chmod=755 docker/scripts/generate-corefile.py /generate-corefile.py
+
+# Copy the Jinja2 template
+COPY docker/templates/Corefile.j2 /templates/Corefile.j2
 
 # Expose DNS port
 EXPOSE 53/udp

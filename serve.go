@@ -10,10 +10,11 @@ import (
 )
 
 // ServeDNS handles DNS requests for the Tailscale domain.
-// It checks if the request matches the domain, looks up the record, and responds accordingly.
 func (t *Tailscale) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
 	queryName := state.Name()
+
+	// Check Tailscale domain
 	if !strings.HasSuffix(queryName, t.Domain+".") {
 		return plugin.NextOrFailure(t.Name(), t.Next, ctx, w, r)
 	}

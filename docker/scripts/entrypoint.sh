@@ -16,19 +16,17 @@ EOF
 
 echo "Starting tailscale-coredns container..."
 
-# Generate Corefile from environment variables
-echo "Generating Corefile with domain: $TS_DOMAIN"
-cat <<EOF > /Corefile
-. {
-    tailscale $TS_DOMAIN
-    forward . /etc/resolv.conf
-    log
-    errors
-}
-EOF
+# Set default values
+TS_HOSTS_FILE=${TS_HOSTS_FILE:-""}
+TS_FORWARD_TO=${TS_FORWARD_TO:-"/etc/resolv.conf"}
 
-echo "Corefile generated:"
-cat /Corefile
+# Generate Corefile from environment variables using Jinja2
+echo "Generating Corefile with domain: $TS_DOMAIN"
+echo "Hosts file: $TS_HOSTS_FILE"
+echo "Forward to: $TS_FORWARD_TO"
+
+# Generate Corefile using Python script with Jinja2
+python3 /generate-corefile.py
 
 # Run tailscaled in the background
 echo "Starting tailscaled..."

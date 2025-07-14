@@ -37,6 +37,7 @@ func New(domain string) (*Tailscale, error) {
 		records: make(map[string]record),
 		lc:      &tailscale.LocalClient{Socket: "/run/tailscale/tailscaled.sock"},
 	}
+	
 	go ts.periodicRefresh()
 	return ts, nil
 }
