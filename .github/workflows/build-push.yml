@@ -12,7 +12,7 @@ on:
 
 env:
   PLATFORMS: linux/amd64,linux/arm64
-  GITHUB_URL: ghcr.io/${{ github.actor }}/tailscale-coredns
+  GHCR_IMAGE_URL: ghcr.io/${{ github.actor }}/tailscale-coredns
 
 jobs:
   build:
@@ -40,9 +40,9 @@ jobs:
       - name: Set image tags
         id: tags
         run: |
-          TAGS="${{ env.GITHUB_URL }}:latest"
+          TAGS="${{ env.GHCR_IMAGE_URL }}:latest"
           if [ "${{ github.ref_type }}" = "tag" ]; then
-            TAGS="$TAGS,${{ env.GITHUB_URL }}:${{ github.ref_name }}"
+            TAGS="$TAGS,${{ env.GHCR_IMAGE_URL }}:${{ github.ref_name }}"
           fi
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
 
