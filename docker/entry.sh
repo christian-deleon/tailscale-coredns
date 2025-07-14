@@ -24,9 +24,11 @@ done
 tailscale --socket=/run/tailscale/tailscaled.sock up --authkey="$TS_AUTHKEY" --hostname="$TS_HOSTNAME"
 
 # Wait for connection to be established
-until tailscale --socket=/run/tailscale/tailscaled.sock status; do
+echo "Waiting for connection to be established..."
+while ! tailscale --socket=/run/tailscale/tailscaled.sock status >/dev/null 2>&1; do
   sleep 0.1
 done
+echo "Connection established"
 
 # Run CoreDNS
 exec /coredns -conf /Corefile
