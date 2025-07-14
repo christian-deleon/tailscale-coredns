@@ -1,10 +1,25 @@
 version: 2
+
 updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      go-patches-and-minors:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
   - package-ecosystem: "docker"
     directory: "/docker"
     schedule:
       interval: "weekly"
+    groups:
+      docker-patches-and-minors:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
