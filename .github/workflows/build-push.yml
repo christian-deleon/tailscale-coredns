@@ -55,9 +55,16 @@ jobs:
         with:
           context: .
           file: docker/Dockerfile
-          push: true
+          push: false
+          load: true
           platforms: ${{ matrix.platform }}
-          tags: ${{ steps.tags.outputs.tags }}
+          tags: local-image:build
+
+      - name: Push single manifest
+        run: |
+          SHA="${{ github.sha }}"
+          docker tag local-image:build ${{ env.GHCR_IMAGE_URL }}:$SHA-${{ matrix.arch }}
+          docker push ${{ env.GHCR_IMAGE_URL }}:$SHA-${{ matrix.arch }}
 
   manifest:
     needs: build
