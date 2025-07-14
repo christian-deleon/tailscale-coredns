@@ -10,97 +10,102 @@ import (
 	"net/netip"
 
 	"tailscale.com/client/tailscale"
+	"tailscale.com/ipn/ipnstate"
 
 	"github.com/coredns/coredns/plugin"
 	clog "github.com/coredns/coredns/plugin/pkg/log"
 )
 
+type record struct {
+	IPv4 net.IP
+	IPv6 net.IP
+}
+
 type Tailscale struct {
-	Next       plugin.Handler
-	Domain     string
-	records    map[string]struct{ ipv4, ipv6 net.IP }
-	mu         sync.RWMutex
-	lc         *tailscale.LocalClient
+	Next    plugin.Handler
+	Domain  string
+	records map[string]record
+	mu      sync.RWMutex
+	lc      *tailscale.LocalClient
 }
 
 func New(domain string) (*Tailscale, error) {
 	ts := &Tailscale{
 		Domain:  domain,
-		records: make(map[string]struct{ ipv4, ipv6 net.IP }),
+		records: make(map[string]record),
 		lc:      &tailscale.LocalClient{Socket: "/run/tailscale/tailscaled.sock"},
 	}
 	go ts.periodicRefresh()
 	return ts, nil
 }
 
+// periodicRefresh periodically updates the DNS records every 30 seconds.
+// Using a ticker allows for better control and cleanup if needed in the future.
 func (t *Tailscale) periodicRefresh() {
-	for {
+	ticker := time.NewTicker(30 * time.Second)
+	for range ticker.C {
 		t.refresh()
-		time.Sleep(30 * time.Second)
 	}
 }
 
+// refresh fetches the current Tailscale status and updates the local DNS records.
+// This ensures that DNS queries reflect the latest network state.
 func (t *Tailscale) refresh() {
 	ctx := context.Background()
 	status, err := t.lc.Status(ctx)
 	if err != nil {
-		clog.Error(err)
+		clog.Errorf("failed to get Tailscale status: %v", err)
 		return
 	}
 	if status == nil || status.Self == nil {
+		clog.Warning("received nil status or self node from Tailscale")
 		return
 	}
 
-	newRecords := make(map[string]struct{ ipv4, ipv6 net.IP })
+	newRecords := make(map[string]record)
 
-	addRecord := func(fqdn string, ips []netip.Addr) {
-		var ipv4, ipv6 net.IP
-		for _, ip := range ips {
-			if ip.Is4() {
-				ipv4 = ip.AsSlice()
-			} else if ip.Is6() {
-				ipv6 = ip.AsSlice()
-			}
-		}
-		newRecords[fqdn] = struct{ ipv4, ipv6 net.IP }{ipv4, ipv6}
-	}
+	// Process self node
+	t.processNode(newRecords, status.Self)
 
-	// Self
-	self := status.Self
-	host := strings.ToLower(self.HostName)
-	fqdn := host + "." + t.Domain + "."
-	addRecord(fqdn, self.TailscaleIPs)
-	if self.Tags != nil {
-		for _, tag := range self.Tags.AsSlice() {
-			if strings.HasPrefix(tag, "tag:subdomain-") {
-				sub := strings.TrimPrefix(tag, "tag:subdomain-")
-				sub = strings.ReplaceAll(sub, "-", ".")
-				subFqdn := host + "." + sub + "." + t.Domain + "."
-				addRecord(subFqdn, self.TailscaleIPs)
-			}
-		}
-	}
-
-	// Peers
-	if status.Peer != nil {
-		for _, peer := range status.Peer {
-			host = strings.ToLower(peer.HostName)
-			fqdn = host + "." + t.Domain + "."
-			addRecord(fqdn, peer.TailscaleIPs)
-			if peer.Tags != nil {
-				for _, tag := range peer.Tags.AsSlice() {
-					if strings.HasPrefix(tag, "tag:subdomain-") {
-						sub := strings.TrimPrefix(tag, "tag:subdomain-")
-						sub = strings.ReplaceAll(sub, "-", ".")
-						subFqdn := host + "." + sub + "." + t.Domain + "."
-						addRecord(subFqdn, peer.TailscaleIPs)
-					}
-				}
-			}
-		}
+	// Process peer nodes
+	for _, peer := range status.Peer {
+		t.processNode(newRecords, peer)
 	}
 
 	t.mu.Lock()
 	t.records = newRecords
 	t.mu.Unlock()
+}
+
+// processNode adds DNS records for a given node, including any subdomain tags.
+// Subdomain tags allow custom DNS mappings for nodes, enhancing flexibility in naming.
+func (t *Tailscale) processNode(records map[string]record, peer *ipnstate.PeerStatus) {
+	host := strings.ToLower(peer.HostName)
+	fqdn := host + "." + t.Domain + "."
+	records[fqdn] = t.ipsToRecord(peer.TailscaleIPs)
+
+	if peer.Tags != nil {
+		for _, tag := range peer.Tags.AsSlice() {
+			if strings.HasPrefix(tag, "tag:subdomain-") {
+				sub := strings.TrimPrefix(tag, "tag:subdomain-")
+				sub = strings.ReplaceAll(sub, "-", ".")
+				subFqdn := host + "." + sub + "." + t.Domain + "."
+				records[subFqdn] = t.ipsToRecord(peer.TailscaleIPs)
+			}
+		}
+	}
+}
+
+// ipsToRecord converts a list of IP addresses to a record struct,
+// selecting the first IPv4 and IPv6 addresses found.
+func (t *Tailscale) ipsToRecord(ips []netip.Addr) record {
+	var ipv4, ipv6 net.IP
+	for _, ip := range ips {
+		if ip.Is4() && ipv4 == nil {
+			ipv4 = ip.AsSlice()
+		} else if ip.Is6() && ipv6 == nil {
+			ipv6 = ip.AsSlice()
+		}
+	}
+	return record{IPv4: ipv4, IPv6: ipv6}
 }

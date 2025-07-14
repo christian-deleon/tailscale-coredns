@@ -9,10 +9,12 @@ import (
 
 var log = clog.NewWithPlugin("tailscale")
 
+// init registers the tailscale plugin with CoreDNS.
 func init() {
 	plugin.Register("tailscale", setup)
 }
 
+// setup configures the Tailscale plugin with the given domain.
 func setup(c *caddy.Controller) error {
 	var domain string
 	c.Next() // 'tailscale'
