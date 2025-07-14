@@ -1,0 +1,21 @@
+services:
+  tailscale-coredns:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    volumes:
+      - tailscale-state:/state
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_DOMAIN=${TS_DOMAIN}
+      - TS_HOSTNAME=${TS_HOSTNAME}
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - "53:53/udp"
+
+volumes:
+  tailscale-state:
+    driver: local

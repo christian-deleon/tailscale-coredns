@@ -1,0 +1,8 @@
+start:
+    docker compose --env-file .env up --build
+
+stop:
+    docker compose --env-file .env down
+
+clean:
+    docker compose --env-file .env down --volumes --rmi all
