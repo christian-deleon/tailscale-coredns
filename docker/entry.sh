@@ -21,7 +21,10 @@ until [ -S /run/tailscale/tailscaled.sock ]; do
 done
 
 # Authenticate with Tailscale
-tailscale --socket=/run/tailscale/tailscaled.sock up --authkey="$TS_AUTHKEY" --hostname="$TS_HOSTNAME"
+tailscale --socket=/run/tailscale/tailscaled.sock up \
+  --authkey="$TS_AUTHKEY" \
+  --advertise-tags=tag:tailscale-coredns \
+  --hostname="$TS_HOSTNAME"
 
 # Wait for connection to be established
 echo "Waiting for connection to be established..."
