@@ -32,6 +32,9 @@ RUN apk add --no-cache ca-certificates iptables ip6tables python3 py3-pip py3-ji
     mv tailscaled /usr/bin/tailscaled && \
     rm tailscale_${TAILSCALE_VERSION}_${TARGETARCH}.tgz
 
+# Create the /etc/coredns directory for custom hosts file
+RUN mkdir -p /etc/coredns
+
 # Copy the built CoreDNS binary
 COPY --from=builder /coredns /coredns
 

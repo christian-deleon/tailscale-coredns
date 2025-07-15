@@ -5,7 +5,7 @@ services:
       dockerfile: docker/Dockerfile
     volumes:
       - tailscale-state:/state
-      - ./hosts:/etc/hosts:ro # Optional: Mount hosts file
+      - ./hosts:/etc/coredns/custom_hosts:ro # Optional: Mount hosts file
     environment:
       - TS_AUTHKEY=${TS_AUTHKEY}
       - TS_DOMAIN=${TS_DOMAIN}

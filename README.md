@@ -48,8 +48,8 @@ The OAuth client requires the following permissions with the tag `tag:tailscale-
    # Required: Hostname for this CoreDNS instance
    TS_HOSTNAME=coredns
 
-   # Optional: Path to hosts file (default: /etc/hosts)
-   TS_HOSTS_FILE=/etc/hosts
+   # Optional: Path to hosts file (default: /etc/coredns/custom_hosts)
+   TS_HOSTS_FILE=/etc/coredns/custom_hosts
 
    # Optional: Forward server for unresolved queries (default: 8.8.8.8)
    TS_FORWARD_TO=8.8.8.8
@@ -92,7 +92,7 @@ The OAuth client requires the following permissions with the tag `tag:tailscale-
 - `TS_AUTHKEY` (required): Tailscale OAuth authentication key
 - `TS_DOMAIN` (required): Your domain name for DNS resolution
 - `TS_HOSTNAME` (required): Hostname for this CoreDNS instance
-- `TS_HOSTS_FILE` (optional): Path to hosts file for custom DNS entries
+- `TS_HOSTS_FILE` (optional): Path to hosts file for custom DNS entries (default: /etc/coredns/custom_hosts)
 - `TS_FORWARD_TO` (optional): Forward server for unresolved queries (default: 8.8.8.8)
 - `TSC_REFRESH_INTERVAL` (optional): Refresh interval in seconds (default: 30)
 
@@ -103,7 +103,7 @@ The plugin supports a simple Corefile configuration:
 ```
 . {
     tailscale mydomain.com
-    hosts /etc/hosts {
+    hosts /etc/coredns/custom_hosts {
         fallthrough
     }
     forward . 8.8.8.8
