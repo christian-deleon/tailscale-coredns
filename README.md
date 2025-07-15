@@ -99,6 +99,11 @@ The OAuth client requires the following permissions with the tag `tag:tailscale-
 - `TS_EPHEMERAL` (optional): Enable ephemeral mode for Tailscale (default: false). When set to true, the node will be automatically removed when it goes offline
 - `TSC_REFRESH_INTERVAL` (optional): Refresh interval in seconds (default: 30)
 
+### Volume Mounts
+
+- `/etc/coredns/custom_hosts` (optional): Custom hosts file for DNS entries
+- `/etc/coredns/additional.conf` (optional): Additional CoreDNS configuration for built-in plugins like route53, etcd, kubernetes
+
 ### Corefile Configuration
 
 The plugin supports a simple Corefile configuration:
@@ -110,6 +115,46 @@ The plugin supports a simple Corefile configuration:
         fallthrough
     }
     forward . 8.8.8.8
+    log
+    errors
+}
+```
+
+### Additional Plugins
+
+You can extend the CoreDNS configuration with additional built-in plugins by mounting an `additional.conf` file. This allows you to use plugins like `route53`, `etcd`, `kubernetes`, `cache`, and `prometheus`.
+
+#### Setup
+
+1. **Create an additional configuration file**:
+   ```bash
+   cp docker/additional.conf.example docker/additional.conf
+   ```
+
+2. **Edit the configuration** with your specific plugin settings:
+   ```bash
+   # Example: Route53 plugin
+   example.private. {
+       route53 example.private.:Z0123456789ABCDEF
+       fallthrough
+       log
+       errors
+   }
+   ```
+
+3. **Mount the file** in your docker-compose.yml (already configured):
+   ```yaml
+   volumes:
+     - ./additional.conf:/etc/coredns/additional.conf:ro
+   ```
+
+#### Examples
+
+**Route53 Plugin**:
+```
+example.private. {
+    route53 example.private.:Z0123456789ABCDEF
+    fallthrough
     log
     errors
 }
@@ -184,6 +229,7 @@ tailscale-coredns/
 │   ├── docker-compose.yml
 │   ├── example.env
 │   ├── hosts        # Example hosts file
+│   ├── additional.conf.example  # Example additional plugins config
 │   ├── justfile     # Common commands
 │   ├── scripts/
 │   │   ├── entrypoint.sh

@@ -18,6 +18,7 @@ def generate_corefile():
     domain = os.getenv('TS_DOMAIN', '')
     hosts_file = os.getenv('TS_HOSTS_FILE', '')
     forward_to = os.getenv('TS_FORWARD_TO', '/etc/resolv.conf')
+    additional_config = os.getenv('TS_ADDITIONAL_CONFIG', '')
 
     # Only use hosts_file if it's not empty
     if not hosts_file or hosts_file.strip() == '':
@@ -29,6 +30,10 @@ def generate_corefile():
         hosts_file=hosts_file,
         forward_to=forward_to
     )
+
+    # Append additional configuration if provided
+    if additional_config and additional_config.strip():
+        corefile_content += "\n" + additional_config
 
     # Write to /Corefile
     with open('/Corefile', 'w') as f:

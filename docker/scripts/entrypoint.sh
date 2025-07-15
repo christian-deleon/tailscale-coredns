@@ -21,10 +21,20 @@ TS_HOSTS_FILE=${TS_HOSTS_FILE:-""}
 TS_FORWARD_TO=${TS_FORWARD_TO:-"/etc/resolv.conf"}
 TS_EPHEMERAL=${TS_EPHEMERAL:-"false"}
 
+# Read additional configuration file if mounted
+if [ -f "/etc/coredns/additional.conf" ]; then
+    echo "Found additional configuration file"
+    TS_ADDITIONAL_CONFIG=$(cat /etc/coredns/additional.conf)
+    export TS_ADDITIONAL_CONFIG
+fi
+
 # Generate Corefile from environment variables using Jinja2
 echo "Generating Corefile with domain: $TS_DOMAIN"
 echo "Hosts file: $TS_HOSTS_FILE"
 echo "Forward to: $TS_FORWARD_TO"
+if [ -n "$TS_ADDITIONAL_CONFIG" ]; then
+    echo "Additional configuration will be appended"
+fi
 
 # Generate Corefile using Python script with Jinja2
 python3 /generate-corefile.py
