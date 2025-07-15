@@ -6,7 +6,7 @@ updates:
     schedule:
       interval: "weekly"
     groups:
-      go-patches-and-minors:
+      all-dependencies:
         patterns:
           - "*"
         update-types:
@@ -17,7 +17,7 @@ updates:
     schedule:
       interval: "weekly"
     groups:
-      docker-patches-and-minors:
+      all-dependencies:
         patterns:
           - "*"
         update-types:
