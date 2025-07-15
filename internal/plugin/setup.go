@@ -1,4 +1,4 @@
-package tailscale
+package plugin
 
 import (
 	"github.com/coredns/caddy"
@@ -17,14 +17,14 @@ func init() {
 // setup configures the Tailscale plugin with the given domain.
 func setup(c *caddy.Controller) error {
 	var domain string
-	
+
 	c.Next() // 'tailscale'
 	if c.NextArg() {
 		domain = c.Val()
 	} else {
 		return c.ArgErr()
 	}
-	
+
 	// Check for any additional arguments
 	if c.NextArg() {
 		return c.ArgErr()
