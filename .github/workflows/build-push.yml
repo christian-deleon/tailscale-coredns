@@ -9,7 +9,7 @@ on:
       - '*.go'
       - 'go.*'
       - 'docker/Dockerfile'
-      - 'docker/entrypoint.sh'
+      - 'docker/ts-dns/**'
 
 env:
   PLATFORMS: linux/amd64,linux/arm64
