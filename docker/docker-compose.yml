@@ -7,8 +7,8 @@ services:
       dockerfile: docker/Dockerfile
     volumes:
       - tailscale-state:/state
-      - ./ts-dns/hosts/custom_hosts:/etc/ts-dns/hosts/custom_hosts:ro                 # Optional: Mount hosts file
-      - ./ts-dns/additional/additional.conf:/etc/ts-dns/additional/additional.conf:ro # Optional: Mount additional CoreDNS configuration
+      - ./ts-dns/hosts/custom_hosts:/etc/ts-dns/hosts/custom_hosts:ro # Optional: Mount hosts file
+      # - ./ts-dns/additional/additional.conf:/etc/ts-dns/additional/additional.conf:ro # Optional: Mount additional CoreDNS configuration
     environment:
       - TS_AUTHKEY=${TS_AUTHKEY}
       - TS_DOMAIN=${TS_DOMAIN}
