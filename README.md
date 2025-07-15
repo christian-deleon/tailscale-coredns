@@ -15,7 +15,7 @@ This project provides a high-availability Go service that integrates a CoreDNS p
 - **Graceful Shutdown**: Proper cleanup and signal handling for container orchestration
 - **Split DNS Support**: Optional split DNS management for high availability deployments
 - **OAuth Authentication**: Secure authentication using Tailscale OAuth credentials
-- **Go Native**: Pure Go implementation with no Python or shell script dependencies
+- **Go Native**: Pure Go implementation
 - **Configuration Templating**: Built-in Corefile generation with Go templates
 
 ## Authentication
@@ -42,17 +42,20 @@ This ensures that multiple instances can run simultaneously without conflicts.
 ### Docker Deployment (Recommended)
 
 1. **Clone the repository**:
+
    ```bash
    git clone https://github.com/christian-deleon/tailscale-coredns.git
    cd tailscale-coredns
    ```
 
 2. **Create environment file**:
+
    ```bash
    cp docker/example.env docker/.env
    ```
 
 3. **Configure custom files** (optional):
+
    ```bash
    # Custom hosts file
    cp docker/ts-dns/hosts/custom_hosts docker/ts-dns/hosts/custom_hosts.example
@@ -64,7 +67,8 @@ This ensures that multiple instances can run simultaneously without conflicts.
    ```
 
    **Hosts File Format**: The hosts file uses standard hosts file format:
-   ```
+
+   ```text
    # Custom DNS entries
    192.168.1.100    serviceA.mydomain.com
    192.168.1.101    serviceB.mydomain.com
@@ -72,6 +76,7 @@ This ensures that multiple instances can run simultaneously without conflicts.
    ```
 
 4. **Edit the environment file** with your Tailscale credentials:
+
    ```bash
    # Required: Tailscale OAuth credentials
    # Get these from https://login.tailscale.com/admin/settings/oauth
@@ -98,7 +103,8 @@ This ensures that multiple instances can run simultaneously without conflicts.
    TS_EPHEMERAL=true
    ```
 
-4. **Start the service**:
+5. **Start the service**:
+
    ```bash
    cd docker
    docker compose --env-file .env up --build
@@ -111,6 +117,7 @@ This ensures that multiple instances can run simultaneously without conflicts.
    - Git
 
 2. **Build the service**:
+
    ```bash
    # Clone the repository
    git clone https://github.com/christian-deleon/tailscale-coredns.git
@@ -135,6 +142,7 @@ This ensures that multiple instances can run simultaneously without conflicts.
    ```
 
 3. **Run the service**:
+
    ```bash
    # Set required environment variables
    export TS_CLIENT_ID="your-client-id"
@@ -170,23 +178,26 @@ When `TS_ENABLE_SPLIT_DNS` is set to `true`, the plugin will:
 3. **High Availability**: Multiple instances can run simultaneously, each managing only its own IP
 
 **Requirements for Split DNS**:
+
 - The OAuth client must have `dns:read` and `dns:write` permissions
 - The domain name must be in the format `tailnet.com` (e.g., `mydomain.com`)
 
 **Finding Your Tailnet Name**:
+
 If split DNS operations fail with 404 errors, you may need to explicitly set your tailnet name:
+
 1. Run `tailscale status` on any device in your tailnet
 2. Look for the DNS name (e.g., `hostname.tail326daa.ts.net`)
 3. You can set `TS_TAILNET` to any of these formats (all will be normalized automatically):
    - `TS_TAILNET=tail326daa` (just the tailnet name)
-   - `TS_TAILNET=tail326daa.ts.net` (full format) 
+   - `TS_TAILNET=tail326daa.ts.net` (full format)
    - `TS_TAILNET=hostname.tail326daa.ts.net` (hostname format)
 
 ### Directory Structure
 
 The plugin uses `/etc/ts-dns/` as the base directory for configuration files:
 
-```
+```text
 /etc/ts-dns/
 ├── hosts/
 │   └── custom_hosts          # Custom DNS entries (hosts file format)
@@ -203,7 +214,7 @@ The plugin uses `/etc/ts-dns/` as the base directory for configuration files:
 
 The plugin supports a simple Corefile configuration:
 
-```
+```corefile
 . {
     tailscale mydomain.com
     hosts /etc/ts-dns/hosts/custom_hosts {
@@ -222,12 +233,14 @@ You can extend the CoreDNS configuration with additional built-in plugins by mou
 #### Setup
 
 1. **Create an additional configuration file**:
+
    ```bash
    cp docker/additional.conf.example docker/ts-dns/additional/additional.conf
    ```
 
 2. **Edit the configuration** with your specific plugin settings:
-   ```bash
+
+   ```corefile
    # Example: Route53 plugin
    example.private. {
        route53 example.private.:Z0123456789ABCDEF
@@ -238,6 +251,7 @@ You can extend the CoreDNS configuration with additional built-in plugins by mou
    ```
 
 3. **Mount the file** in your docker-compose.yml (already configured):
+
    ```yaml
    volumes:
      - ./ts-dns/additional/additional.conf:/etc/ts-dns/additional/additional.conf:ro
@@ -246,7 +260,8 @@ You can extend the CoreDNS configuration with additional built-in plugins by mou
 #### Examples
 
 **Route53 Plugin**:
-```
+
+```corefile
 example.private. {
     route53 example.private.:Z0123456789ABCDEF
     fallthrough
@@ -275,7 +290,7 @@ The plugin supports custom subdomains using Tailscale tags:
 
 The plugin converts hyphens in tag names to dots in the subdomain.
 
-### Examples
+### DNS Usage Examples
 
 ```bash
 # Basic hostname resolution
@@ -326,7 +341,7 @@ just clean
 
 ### Project Structure
 
-```
+```text
 tailscale-coredns/
 ├── cmd/                      # Command-line applications
 │   ├── tailscale-coredns/    # Main HA service application
@@ -366,11 +381,13 @@ tailscale-coredns/
 ### Local Development
 
 1. **Run tests**:
+
    ```bash
    go test ./...
    ```
 
 2. **Build the applications**:
+
    ```bash
    # Build the main service
    go build ./cmd/tailscale-coredns
@@ -380,6 +397,7 @@ tailscale-coredns/
    ```
 
 3. **Test locally**:
+
    ```bash
    # Set environment variables
    export TS_CLIENT_ID="your-client-id"
@@ -392,6 +410,7 @@ tailscale-coredns/
    ```
 
 4. **Development tools**:
+
    ```bash
    # Check split DNS status
    ./splitdns -action=status -domain=your-domain.com
@@ -456,6 +475,7 @@ Created by [Christian De Leon](https://github.com/christian-deleon)
 ## Support
 
 For issues and questions:
+
 - [GitHub Issues](https://github.com/christian-deleon/tailscale-coredns/issues)
 - [Tailscale Documentation](https://tailscale.com/docs/)
 - [CoreDNS Documentation](https://coredns.io/manual/toc/)

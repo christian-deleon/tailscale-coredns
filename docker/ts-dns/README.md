@@ -4,7 +4,7 @@ This directory contains the configuration files for the Tailscale CoreDNS plugin
 
 ## Directory Structure
 
-```
+```text
 /etc/ts-dns/
 ├── hosts/
 │   └── custom_hosts          # Custom DNS entries (hosts file format)
@@ -15,10 +15,12 @@ This directory contains the configuration files for the Tailscale CoreDNS plugin
 ## Files
 
 ### `/etc/ts-dns/hosts/custom_hosts`
+
 Custom DNS entries in hosts file format. This file allows you to add static DNS entries that will be resolved alongside Tailscale hostnames.
 
 Example:
-```
+
+```text
 # Custom DNS entries
 192.168.1.100    serviceA.mydomain.com
 192.168.1.101    serviceB.mydomain.com
@@ -26,10 +28,12 @@ Example:
 ```
 
 ### `/etc/ts-dns/additional/additional.conf`
+
 Additional CoreDNS configuration for built-in plugins like route53, etcd, kubernetes, cache, and prometheus.
 
 Example:
-```
+
+```text
 # Route53 plugin configuration
 example.private. {
     route53 example.private.:Z0123456789ABCDEF
@@ -47,4 +51,4 @@ example.private. {
 
 ## File Permissions
 
-All files should be readable by the CoreDNS process. The Docker container mounts these files as read-only (`:ro`) for security. 
+All files should be readable by the CoreDNS process. The Docker container mounts these files as read-only (`:ro`) for security.
