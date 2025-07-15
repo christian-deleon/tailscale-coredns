@@ -19,6 +19,7 @@ echo "Starting tailscale-coredns container..."
 # Set default values
 TS_HOSTS_FILE=${TS_HOSTS_FILE:-""}
 TS_FORWARD_TO=${TS_FORWARD_TO:-"/etc/resolv.conf"}
+TS_EPHEMERAL=${TS_EPHEMERAL:-"false"}
 
 # Generate Corefile from environment variables using Jinja2
 echo "Generating Corefile with domain: $TS_DOMAIN"
@@ -42,7 +43,7 @@ echo "tailscaled socket ready"
 # Authenticate with Tailscale
 echo "Authenticating with Tailscale..."
 tailscale --socket=/run/tailscale/tailscaled.sock up \
-  --authkey="${TS_AUTHKEY}?ephemeral=false" \
+  --authkey="${TS_AUTHKEY}?ephemeral=${TS_EPHEMERAL}" \
   --advertise-tags=tag:tailscale-coredns \
   --hostname="$TS_HOSTNAME"
 

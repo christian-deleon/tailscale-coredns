@@ -53,6 +53,9 @@ The OAuth client requires the following permissions with the tag `tag:tailscale-
 
    # Optional: Forward server for unresolved queries (default: 8.8.8.8)
    TS_FORWARD_TO=8.8.8.8
+
+   # Optional: Enable ephemeral mode for Tailscale (default: false)
+   TS_EPHEMERAL=false
    ```
 
 4. **Start the service**:
@@ -94,6 +97,7 @@ The OAuth client requires the following permissions with the tag `tag:tailscale-
 - `TS_HOSTNAME` (required): Hostname for this CoreDNS instance
 - `TS_HOSTS_FILE` (optional): Path to hosts file for custom DNS entries (default: /etc/coredns/custom_hosts)
 - `TS_FORWARD_TO` (optional): Forward server for unresolved queries (default: 8.8.8.8)
+- `TS_EPHEMERAL` (optional): Enable ephemeral mode for Tailscale (default: false). When set to true, the node will be automatically removed when it goes offline
 - `TSC_REFRESH_INTERVAL` (optional): Refresh interval in seconds (default: 30)
 
 ### Corefile Configuration

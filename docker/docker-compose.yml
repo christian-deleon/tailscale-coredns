@@ -10,8 +10,9 @@ services:
       - TS_AUTHKEY=${TS_AUTHKEY}
       - TS_DOMAIN=${TS_DOMAIN}
       - TS_HOSTNAME=${TS_HOSTNAME}
-      - TS_HOSTS_FILE=${TS_HOSTS_FILE} # Optional: Path to hosts file
+      - TS_HOSTS_FILE=${TS_HOSTS_FILE:-/etc/coredns/custom_hosts} # Optional: Path to hosts file
       - TS_FORWARD_TO=${TS_FORWARD_TO} # Optional: Forward server
+      - TS_EPHEMERAL=${TS_EPHEMERAL}   # Optional: Ephemeral mode
     cap_add:
       - NET_ADMIN
     devices:
