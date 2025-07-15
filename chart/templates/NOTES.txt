@@ -1,0 +1,66 @@
+{{- if .Values.service.enabled }}
+1. Get the application URL by running these commands:
+{{- if contains "NodePort" .Values.service.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "tailscale-coredns.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo "DNS service is available at: $NODE_IP:$NODE_PORT"
+{{- else if contains "LoadBalancer" .Values.service.type }}
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+        You can watch the status of by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "tailscale-coredns.fullname" . }}'
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "tailscale-coredns.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo "DNS service is available at: $SERVICE_IP:53"
+{{- else if contains "ClusterIP" .Values.service.type }}
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "tailscale-coredns.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  echo "Visit http://127.0.0.1:8080 to use your application"
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8080:80
+{{- end }}
+{{- else }}
+1. Service is disabled (default for Split DNS deployment)
+   For Split DNS with Tailscale, configure your Tailscale DNS settings to point to this CoreDNS instance.
+{{- end }}
+
+{{- if .Values.service.enabled }}
+2. Test DNS resolution:
+   # Test basic DNS resolution
+   nslookup {{ .Values.tailscale.domain }} $SERVICE_IP
+   
+   # Test Tailscale hostname resolution
+   nslookup {{ .Values.tailscale.hostname }}.{{ .Values.tailscale.domain }} $SERVICE_IP
+{{- else }}
+2. Configure Tailscale Split DNS:
+   # Get the Tailscale IP (Tailnet IP) of the CoreDNS device
+   tailscale ip ts-dns
+   
+   # Configure this Tailscale IP in your Tailscale DNS settings
+   # Go to your Tailscale admin console > DNS settings
+   # Or get the IP from https://login.tailscale.com/admin/machines
+{{- end }}
+
+3. Check the logs:
+   kubectl logs --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "tailscale-coredns.name" . }},app.kubernetes.io/instance={{ .Release.Name }}"
+
+{{- if .Values.service.enabled }}
+4. Access the application:
+   # Port forward to access the service locally
+   kubectl port-forward --namespace {{ .Release.Namespace }} svc/{{ include "tailscale-coredns.fullname" . }} 5353:53
+{{- else }}
+4. Access the application (Split DNS):
+   # For Split DNS, access is through Tailscale network only
+   # No external port forwarding needed
+{{- end }}
+
+5. Configuration:
+   - Tailscale Domain: {{ .Values.tailscale.domain }}
+   - Tailscale Hostname: {{ .Values.tailscale.hostname }}
+   - Forward Server: {{ .Values.tailscale.forwardTo }}
+   - Ephemeral Mode: {{ .Values.tailscale.ephemeral }}
+
+6. Troubleshooting:
+   # Check if the pod is running
+   kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "tailscale-coredns.name" . }},app.kubernetes.io/instance={{ .Release.Name }}"
+   
+   # Check pod events
+   kubectl describe pod --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "tailscale-coredns.name" . }},app.kubernetes.io/instance={{ .Release.Name }}"
+   
+   # Check service
+   kubectl get svc --namespace {{ .Release.Namespace }} {{ include "tailscale-coredns.fullname" . }} 

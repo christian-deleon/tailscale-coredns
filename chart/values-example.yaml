@@ -1,0 +1,166 @@
+# Example values for tailscale-coredns
+# Copy this file and modify it for your deployment
+
+# Image configuration
+image:
+  repository: tailscale-coredns
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# Service account
+serviceAccount:
+  create: true
+  annotations: {}
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    add:
+      - NET_ADMIN
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Tailscale configuration
+tailscale:
+  # REQUIRED: Set these values via --set or environment variables
+  authKey: "tskey-auth-xxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  domain: "example.com"
+  hostname: "coredns"
+  hostsFile: "/etc/ts-dns/hosts/custom_hosts"
+  forwardTo: "8.8.8.8"
+  ephemeral: true
+  refreshInterval: 30
+
+# CoreDNS configuration
+coredns:
+  # Example custom hosts file
+  customHosts: |
+    # Custom DNS entries
+    192.168.1.100    serviceA.example.com
+    192.168.1.101    serviceB.example.com
+    192.168.1.102    serviceC.example.com
+    10.0.0.100       internal.example.com
+    10.0.0.101       database.example.com
+  
+  # Example additional CoreDNS configuration
+  additionalConfig: |
+    # Example: Route53 plugin for private zones
+    private.example.com. {
+        route53 private.example.com.:Z0123456789ABCDEF
+        fallthrough
+        log
+        errors
+    }
+    
+    # Example: Cache plugin for better performance
+    . {
+        cache 30
+        forward . 8.8.8.8 1.1.1.1
+        log
+        errors
+    }
+  
+  logLevel: "info"
+
+# Service configuration
+# Note: For Split DNS with Tailscale, you typically don't need a service exposed externally.
+# The CoreDNS instance will be accessed directly by Tailscale nodes.
+service:
+  enabled: false
+  type: ClusterIP
+  port: 53
+  targetPort: 53
+  annotations: {}
+
+# Resources
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Node selector (optional)
+nodeSelector: {}
+
+# Tolerations (optional)
+tolerations: []
+
+# Affinity (optional)
+affinity: {}
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# Horizontal pod autoscaler
+hpa:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Service monitor for Prometheus
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  annotations: {}
+
+# Persistent volume configuration
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  annotations: {}
+
+# Network policy
+networkPolicy:
+  enabled: false
+  ingressRules: []
+  egressRules: []
+
+# Pod anti-affinity
+podAntiAffinity:
+  enabled: false
+  type: preferred
+  weight: 100
+
+# Health checks
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+  successThreshold: 1
+
+startupProbe:
+  enabled: false
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+  successThreshold: 1 

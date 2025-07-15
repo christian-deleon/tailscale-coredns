@@ -1,0 +1,25 @@
+{{- if .Values.coredns.customHosts }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tailscale-coredns.fullname" . }}-hosts
+  labels:
+    {{- include "tailscale-coredns.labels" . | nindent 4 }}
+data:
+  custom_hosts: |
+{{ .Values.coredns.customHosts | indent 4 }}
+{{- end }}
+
+{{- if .Values.coredns.additionalConfig }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tailscale-coredns.fullname" . }}-config
+  labels:
+    {{- include "tailscale-coredns.labels" . | nindent 4 }}
+data:
+  additional.conf: |
+{{ .Values.coredns.additionalConfig | indent 4 }}
+{{- end }}
