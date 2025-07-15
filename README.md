@@ -1,16 +1,18 @@
 # Tailscale CoreDNS Plugin
 
-This project provides a CoreDNS plugin that resolves DNS names to Tailscale IPs, using tags for nested subdomains. The plugin works alongside CoreDNS's built-in `hosts` and `forward` plugins.
+This project provides a CoreDNS plugin that resolves DNS names to Tailscale IPs, using tags for nested subdomains. The plugin works alongside CoreDNS's built-in `hosts` and `forward` plugins. The primary use case is to configure Tailscale's Split DNS settings to point to this CoreDNS instance, allowing your Tailscale network to use custom DNS resolution for specific domains.
 
 ## Features
 
 - **Tailscale Integration**: Automatically resolves Tailscale hostnames to their IP addresses
+- **Split DNS Support**: Configure Tailscale's DNS settings to use this CoreDNS instance for specific domains
 - **Subdomain Tags**: Support for custom subdomains using Tailscale tags (`tag:subdomain-*`)
 - **Hosts File Support**: Works with CoreDNS's built-in `hosts` plugin for custom DNS entries
 - **Forward Server**: Works with CoreDNS's built-in `forward` plugin for unresolved queries
 - **IPv4/IPv6 Support**: Full support for both IPv4 and IPv6 addresses
 - **Periodic Refresh**: Configurable refresh interval to keep DNS records up-to-date
 - **Docker Ready**: Complete Docker setup with Tailscale client included
+- **Kubernetes Ready**: Helm chart for easy deployment in Kubernetes clusters
 
 ## Authentication
 
@@ -20,6 +22,53 @@ The OAuth client requires the following permissions with the tag `tag:tailscale-
 
 - `auth_keys` (Both read and write)
 - `devices:core` (Both read and write)
+
+## Split DNS Configuration
+
+This CoreDNS instance is designed to work with Tailscale's Split DNS feature. This allows you to:
+
+1. **Restrict DNS traffic** to specific domains
+2. **Use custom DNS resolution** for your internal services
+3. **Maintain security** by only routing specific domains through this DNS server
+
+### Setting up Split DNS
+
+1. **Deploy the CoreDNS instance** (see installation instructions below)
+
+2. **Get the Tailscale IP address** (Tailnet IP):
+   ```bash
+   # From any Tailscale device
+   tailscale ip ts-dns
+
+   # Or get it from the Tailscale admin console
+   # Go to https://login.tailscale.com/admin/machines
+   ```
+
+3. **Configure Tailscale DNS settings**:
+   - Go to your [Tailscale admin console](https://login.tailscale.com/admin/dns)
+   - Navigate to **DNS** settings
+   - Add the **Tailscale IP** (not the server IP) as a **DNS server**
+   - Configure **Split DNS** for your domain(s)
+
+### Split DNS Example
+
+If your domain is `mydomain.com`, you can configure Tailscale to:
+- Use this CoreDNS instance for `*.mydomain.com`
+- Use your regular DNS servers for all other domains
+
+This ensures that:
+- `serviceA.mydomain.com` → Resolved by this CoreDNS instance (via Tailscale IP)
+- `google.com` → Resolved by your regular DNS servers
+- `github.com` → Resolved by your regular DNS servers
+
+**Important**: Use the Tailscale IP (Tailnet IP) of the CoreDNS device, not the server's internal IP address.
+
+### Benefits of Split DNS
+
+- **Security**: Only specific domains are routed through your custom DNS
+- **Performance**: Other domains use fast, reliable DNS servers
+- **Flexibility**: Mix custom and standard DNS resolution
+- **Control**: Fine-grained control over DNS resolution
 
 ## Installation
 
@@ -81,6 +130,39 @@ The OAuth client requires the following permissions with the tag `tag:tailscale-
    cd docker
    docker compose --env-file .env up --build
    ```
+
+### Kubernetes Deployment (Helm Chart)
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/christian-deleon/tailscale-coredns.git
+   cd tailscale-coredns
+   ```
+
+2. **Install using Helm**:
+   ```bash
+   # Basic installation (Split DNS focused)
+   helm install tailscale-coredns ./chart \
+     --set tailscale.authKey="your-oauth-key" \
+     --set tailscale.domain="your-domain.com"
+
+   # Or use the interactive installer
+   cd chart
+   ./install.sh
+   ```
+
+3. **Get the Tailscale IP for Split DNS**:
+   ```bash
+   # From any Tailscale device
+   tailscale ip ts-dns
+
+   # Or get it from the Tailscale admin console
+   # Go to https://login.tailscale.com/admin/machines
+   ```
+
+4. **Configure Tailscale DNS settings** (see Split DNS Configuration above)
+
+For detailed Kubernetes deployment options, see the [chart documentation](./chart/README.md).
 
 ### Manual Build
 
@@ -193,9 +275,17 @@ example.private. {
 
 ## Usage
 
+### Split DNS with Tailscale
+
+The primary use case is to configure Tailscale's Split DNS settings to use this CoreDNS instance for specific domains. This provides:
+
+- **Domain-specific DNS resolution**: Only certain domains use this DNS server
+- **Security**: Other domains continue using your regular DNS servers
+- **Flexibility**: Mix custom and standard DNS resolution
+
 ### Basic DNS Resolution
 
-Once running, the plugin will automatically resolve:
+Once running and configured with Split DNS, the plugin will automatically resolve:
 
 - **Tailscale hostnames**: `hostname.mydomain.com` → Tailscale IP
 - **IPv4 and IPv6**: Both A and AAAA records are supported
@@ -214,17 +304,20 @@ The plugin converts hyphens in tag names to dots in the subdomain.
 ### Examples
 
 ```bash
-# Basic hostname resolution
-dig hostname.mydomain.com @localhost
+# Basic hostname resolution (when using Split DNS)
+dig hostname.mydomain.com
 
 # Subdomain tag resolution (device tagged with tag:subdomain-web-server)
-dig hostname.web.server.mydomain.com @localhost
+dig hostname.web.server.mydomain.com
 
 # IPv6 resolution
-dig AAAA hostname.mydomain.com @localhost
+dig AAAA hostname.mydomain.com
 
 # Custom hosts file entry
-dig serviceA.mydomain.com @localhost
+dig serviceA.mydomain.com
+
+# Test from within the CoreDNS container
+docker exec -it ts-dns-ts-dns-1 nslookup hostname.mydomain.com
 ```
 
 ### Graceful Shutdown
@@ -278,6 +371,12 @@ tailscale-coredns/
 │   │   └── generate-corefile.py
 │   └── templates/
 │       └── Corefile.j2
+├── chart/           # Kubernetes Helm chart
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   ├── templates/   # Kubernetes manifests
+│   ├── install.sh   # Interactive installer
+│   └── README.md    # Chart documentation
 └── README.md
 ```
 
@@ -318,20 +417,32 @@ tailscale-coredns/
    - Check that devices have the correct tags applied
    - Verify the tag conversion (hyphens become dots)
 
+4. **Split DNS not working**:
+   - Verify the **Tailscale IP** (not server IP) is correctly configured in Tailscale DNS settings
+   - Check that Split DNS is enabled for your domain
+   - Ensure the domain matches your `TS_DOMAIN` configuration
+   - Test connectivity from Tailscale devices to the CoreDNS instance
+
 ### Debug Commands
 
 ```bash
 # Check Tailscale status
 tailscale status
 
-# Test DNS resolution
-dig hostname.mydomain.com @localhost
+# Test DNS resolution (when using Split DNS)
+dig hostname.mydomain.com
 
 # View CoreDNS logs
 docker logs tailscale-coredns
 
 # Check Tailscale connectivity
 tailscale ping hostname
+
+# Test from within the CoreDNS container
+docker exec -it ts-dns-ts-dns-1 nslookup hostname.mydomain.com
+
+# Check Split DNS configuration
+docker exec -it ts-dns-ts-dns-1 tailscale ip -4
 ```
 
 ## Contributing

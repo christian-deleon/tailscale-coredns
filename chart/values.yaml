@@ -1,0 +1,184 @@
+# Default values for tailscale-coredns
+# This is a YAML-formatted file.
+
+# Global configuration
+global:
+  # Global image registry override
+  imageRegistry: ""
+  # Global image pull secrets
+  imagePullSecrets: []
+
+# Image configuration
+image:
+  repository: tailscale-coredns
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# Image pull secrets
+imagePullSecrets: []
+
+# Service account configuration
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    add:
+      - NET_ADMIN
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Tailscale configuration
+tailscale:
+  # Tailscale OAuth authentication key (required)
+  authKey: ""
+  # Your domain name for DNS resolution (required)
+  domain: ""
+  # Hostname for this CoreDNS instance (required)
+  hostname: "coredns"
+  # Path to hosts file for custom DNS entries (optional)
+  hostsFile: "/etc/ts-dns/hosts/custom_hosts"
+  # Forward server for unresolved queries (optional, default: 8.8.8.8)
+  forwardTo: "8.8.8.8"
+  # Enable ephemeral mode for Tailscale (optional, default: true)
+  ephemeral: true
+  # Refresh interval in seconds (optional, default: 30)
+  refreshInterval: 30
+
+# CoreDNS configuration
+coredns:
+  # Additional CoreDNS configuration for plugins
+  additionalConfig: ""
+  # Custom hosts file content
+  customHosts: ""
+  # CoreDNS log level
+  logLevel: "info"
+
+# Service configuration
+# Note: For Split DNS with Tailscale, you typically don't need a service exposed externally.
+# The CoreDNS instance will be accessed directly by Tailscale nodes.
+service:
+  enabled: false
+  type: ClusterIP
+  port: 53
+  targetPort: 53
+  annotations: {}
+
+# Ingress configuration
+# Note: Ingress is not typically needed for Split DNS with Tailscale
+# as the CoreDNS instance is accessed directly by Tailscale nodes.
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+
+# Resources configuration
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# Horizontal pod autoscaler
+hpa:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Service monitor for Prometheus
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  annotations: {}
+
+# Persistent volume configuration
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  annotations: {}
+
+# Network policy
+networkPolicy:
+  enabled: false
+  ingressRules: []
+  egressRules: []
+
+# Pod anti-affinity
+podAntiAffinity:
+  enabled: false
+  type: preferred
+  weight: 100
+
+# Liveness probe
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+# Readiness probe
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+  successThreshold: 1
+
+# Startup probe
+startupProbe:
+  enabled: false
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+  successThreshold: 1 

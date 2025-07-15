@@ -1,0 +1,164 @@
+# Production values for tailscale-coredns
+# This file contains recommended settings for production deployments
+
+# Image configuration
+image:
+  repository: tailscale-coredns
+  tag: "latest"
+  pullPolicy: Always
+
+# Service account
+serviceAccount:
+  create: true
+  annotations: {}
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    add:
+      - NET_ADMIN
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Tailscale configuration
+tailscale:
+  # These must be set via --set or environment variables
+  authKey: ""
+  domain: ""
+  hostname: "coredns"
+  hostsFile: "/etc/ts-dns/hosts/custom_hosts"
+  forwardTo: "8.8.8.8"
+  ephemeral: true
+  refreshInterval: 30
+
+# CoreDNS configuration
+coredns:
+  customHosts: ""
+  additionalConfig: ""
+  logLevel: "info"
+
+# Service configuration
+# Note: For Split DNS with Tailscale, you typically don't need a service exposed externally.
+# The CoreDNS instance will be accessed directly by Tailscale nodes.
+service:
+  enabled: false
+  type: ClusterIP
+  port: 53
+  targetPort: 53
+  annotations: {}
+
+# Resources for production
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+# Node selector for production nodes
+nodeSelector:
+  node-role.kubernetes.io/worker: "true"
+
+# Tolerations for production nodes
+tolerations:
+  - key: "node-role.kubernetes.io/worker"
+    operator: "Exists"
+    effect: "NoSchedule"
+
+# Affinity for production deployment
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - tailscale-coredns
+        topologyKey: kubernetes.io/hostname
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Horizontal pod autoscaler
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Service monitor for Prometheus
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+  annotations: {}
+
+# Persistent volume configuration
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 5Gi
+  annotations: {}
+
+# Network policy
+networkPolicy:
+  enabled: true
+  ingressRules:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: dns-clients
+      ports:
+        - protocol: UDP
+          port: 53
+  egressRules:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: internet
+      ports:
+        - protocol: UDP
+          port: 53
+
+# Health checks
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+  successThreshold: 1
+
+startupProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+  successThreshold: 1 

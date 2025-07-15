@@ -1,0 +1,144 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tailscale-coredns.fullname" . }}
+  labels:
+    {{- include "tailscale-coredns.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount | default 1 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "tailscale-coredns.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "tailscale-coredns.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "tailscale-coredns.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: TS_AUTHKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tailscale-coredns.fullname" . }}-secret
+                  key: ts-authkey
+            - name: TS_DOMAIN
+              value: {{ .Values.tailscale.domain | quote }}
+            - name: TS_HOSTNAME
+              value: {{ .Values.tailscale.hostname | quote }}
+            - name: TS_HOSTS_FILE
+              value: {{ .Values.tailscale.hostsFile | quote }}
+            - name: TS_FORWARD_TO
+              value: {{ .Values.tailscale.forwardTo | quote }}
+            - name: TS_EPHEMERAL
+              value: {{ .Values.tailscale.ephemeral | quote }}
+            - name: TSC_REFRESH_INTERVAL
+              value: {{ .Values.tailscale.refreshInterval | quote }}
+          ports:
+            - name: dns
+              containerPort: 53
+              protocol: UDP
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            udp:
+              port: dns
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+            successThreshold: {{ .Values.livenessProbe.successThreshold }}
+          {{- end }}
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            udp:
+              port: dns
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+            successThreshold: {{ .Values.readinessProbe.successThreshold }}
+          {{- end }}
+          {{- if .Values.startupProbe.enabled }}
+          startupProbe:
+            udp:
+              port: dns
+            initialDelaySeconds: {{ .Values.startupProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.startupProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+            successThreshold: {{ .Values.startupProbe.successThreshold }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tailscale-state
+              mountPath: /state
+            {{- if .Values.coredns.customHosts }}
+            - name: custom-hosts
+              mountPath: /etc/ts-dns/hosts/custom_hosts
+              subPath: custom_hosts
+            {{- end }}
+            {{- if .Values.coredns.additionalConfig }}
+            - name: additional-config
+              mountPath: /etc/ts-dns/additional/additional.conf
+              subPath: additional.conf
+            {{- end }}
+      {{- if .Values.persistence.enabled }}
+      volumes:
+        - name: tailscale-state
+          persistentVolumeClaim:
+            claimName: {{ include "tailscale-coredns.fullname" . }}-pvc
+        {{- if .Values.coredns.customHosts }}
+        - name: custom-hosts
+          configMap:
+            name: {{ include "tailscale-coredns.fullname" . }}-hosts
+        {{- end }}
+        {{- if .Values.coredns.additionalConfig }}
+        - name: additional-config
+          configMap:
+            name: {{ include "tailscale-coredns.fullname" . }}-config
+        {{- end }}
+      {{- else }}
+      volumes:
+        - name: tailscale-state
+          emptyDir: {}
+        {{- if .Values.coredns.customHosts }}
+        - name: custom-hosts
+          configMap:
+            name: {{ include "tailscale-coredns.fullname" . }}-hosts
+        {{- end }}
+        {{- if .Values.coredns.additionalConfig }}
+        - name: additional-config
+          configMap:
+            name: {{ include "tailscale-coredns.fullname" . }}-config
+        {{- end }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
