@@ -19,7 +19,7 @@ echo "Starting ts-dns container..."
 # Set default values
 TS_HOSTS_FILE=${TS_HOSTS_FILE:-""}
 TS_FORWARD_TO=${TS_FORWARD_TO:-"/etc/resolv.conf"}
-TS_EPHEMERAL=${TS_EPHEMERAL:-"false"}
+TS_EPHEMERAL=${TS_EPHEMERAL:-"true"}
 
 # Read additional configuration file if mounted
 if [ -f "/etc/ts-dns/additional/additional.conf" ]; then
