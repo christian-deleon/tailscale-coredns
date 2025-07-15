@@ -42,7 +42,7 @@ echo "tailscaled socket ready"
 # Authenticate with Tailscale
 echo "Authenticating with Tailscale..."
 tailscale --socket=/run/tailscale/tailscaled.sock up \
-  --authkey="$TS_AUTHKEY" \
+  --authkey="${TS_AUTHKEY}?ephemeral=false" \
   --advertise-tags=tag:tailscale-coredns \
   --hostname="$TS_HOSTNAME"
 
