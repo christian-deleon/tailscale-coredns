@@ -14,7 +14,7 @@ By Christian De Leon (https://github.com/christian-deleon/tailscale-coredns)
 
 EOF
 
-echo "Starting tailscale-coredns container..."
+echo "Starting ts-dns container..."
 
 # Set default values
 TS_HOSTS_FILE=${TS_HOSTS_FILE:-""}
@@ -22,9 +22,9 @@ TS_FORWARD_TO=${TS_FORWARD_TO:-"/etc/resolv.conf"}
 TS_EPHEMERAL=${TS_EPHEMERAL:-"false"}
 
 # Read additional configuration file if mounted
-if [ -f "/etc/coredns/additional.conf" ]; then
+if [ -f "/etc/ts-dns/additional/additional.conf" ]; then
     echo "Found additional configuration file"
-    TS_ADDITIONAL_CONFIG=$(cat /etc/coredns/additional.conf)
+    TS_ADDITIONAL_CONFIG=$(cat /etc/ts-dns/additional/additional.conf)
     export TS_ADDITIONAL_CONFIG
 fi
 
@@ -54,7 +54,7 @@ echo "tailscaled socket ready"
 echo "Authenticating with Tailscale..."
 tailscale --socket=/run/tailscale/tailscaled.sock up \
   --authkey="${TS_AUTHKEY}?ephemeral=${TS_EPHEMERAL}" \
-  --advertise-tags=tag:tailscale-coredns \
+  --advertise-tags=tag:ts-dns \
   --hostname="$TS_HOSTNAME"
 
 # Wait for connection to be established

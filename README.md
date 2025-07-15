@@ -36,7 +36,26 @@ The OAuth client requires the following permissions with the tag `tag:tailscale-
    cp docker/example.env docker/.env
    ```
 
-3. **Edit the environment file** with your Tailscale credentials:
+3. **Configure custom files** (optional):
+   ```bash
+   # Custom hosts file
+   cp docker/ts-dns/hosts/custom_hosts docker/ts-dns/hosts/custom_hosts.example
+   # Edit the file with your custom DNS entries
+   
+   # Additional configuration
+   cp docker/additional.conf.example docker/ts-dns/additional/additional.conf
+   # Edit the file with your additional CoreDNS configuration
+   ```
+
+   **Hosts File Format**: The hosts file uses standard hosts file format:
+   ```
+   # Custom DNS entries
+   192.168.1.100    serviceA.mydomain.com
+   192.168.1.101    serviceB.mydomain.com
+   192.168.1.102    serviceC.mydomain.com
+   ```
+
+4. **Edit the environment file** with your Tailscale credentials:
    ```bash
    # Required: Tailscale OAuth key
    TS_AUTHKEY=tskey-auth-xxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -47,8 +66,8 @@ The OAuth client requires the following permissions with the tag `tag:tailscale-
    # Required: Hostname for this CoreDNS instance
    TS_HOSTNAME=coredns
 
-   # Optional: Path to hosts file (default: /etc/coredns/custom_hosts)
-   TS_HOSTS_FILE=/etc/coredns/custom_hosts
+   # Optional: Path to hosts file (default: /etc/ts-dns/hosts/custom_hosts)
+   TS_HOSTS_FILE=/etc/ts-dns/hosts/custom_hosts
 
    # Optional: Forward server for unresolved queries (default: 8.8.8.8)
    TS_FORWARD_TO=8.8.8.8
@@ -94,15 +113,27 @@ The OAuth client requires the following permissions with the tag `tag:tailscale-
 - `TS_AUTHKEY` (required): Tailscale OAuth authentication key
 - `TS_DOMAIN` (required): Your domain name for DNS resolution
 - `TS_HOSTNAME` (required): Hostname for this CoreDNS instance
-- `TS_HOSTS_FILE` (optional): Path to hosts file for custom DNS entries (default: /etc/coredns/custom_hosts)
+- `TS_HOSTS_FILE` (optional): Path to hosts file for custom DNS entries (default: /etc/ts-dns/hosts/custom_hosts)
 - `TS_FORWARD_TO` (optional): Forward server for unresolved queries (default: 8.8.8.8)
 - `TS_EPHEMERAL` (optional): Enable ephemeral mode for Tailscale (default: false). When set to true, the node will be automatically removed when it goes offline
 - `TSC_REFRESH_INTERVAL` (optional): Refresh interval in seconds (default: 30)
 
+### Directory Structure
+
+The plugin uses `/etc/ts-dns/` as the base directory for configuration files:
+
+```
+/etc/ts-dns/
+├── hosts/
+│   └── custom_hosts          # Custom DNS entries (hosts file format)
+└── additional/
+    └── additional.conf       # Additional CoreDNS configuration for plugins
+```
+
 ### Volume Mounts
 
-- `/etc/coredns/custom_hosts` (optional): Custom hosts file for DNS entries
-- `/etc/coredns/additional.conf` (optional): Additional CoreDNS configuration for built-in plugins like route53, etcd, kubernetes
+- `/etc/ts-dns/hosts/custom_hosts` (optional): Custom hosts file for DNS entries
+- `/etc/ts-dns/additional/additional.conf` (optional): Additional CoreDNS configuration for built-in plugins like route53, etcd, kubernetes
 
 ### Corefile Configuration
 
@@ -111,7 +142,7 @@ The plugin supports a simple Corefile configuration:
 ```
 . {
     tailscale mydomain.com
-    hosts /etc/coredns/custom_hosts {
+    hosts /etc/ts-dns/hosts/custom_hosts {
         fallthrough
     }
     forward . 8.8.8.8
@@ -128,7 +159,7 @@ You can extend the CoreDNS configuration with additional built-in plugins by mou
 
 1. **Create an additional configuration file**:
    ```bash
-   cp docker/additional.conf.example docker/additional.conf
+   cp docker/additional.conf.example docker/ts-dns/additional/additional.conf
    ```
 
 2. **Edit the configuration** with your specific plugin settings:
@@ -145,7 +176,7 @@ You can extend the CoreDNS configuration with additional built-in plugins by mou
 3. **Mount the file** in your docker-compose.yml (already configured):
    ```yaml
    volumes:
-     - ./additional.conf:/etc/coredns/additional.conf:ro
+     - ./ts-dns/additional/additional.conf:/etc/ts-dns/additional/additional.conf:ro
    ```
 
 #### Examples

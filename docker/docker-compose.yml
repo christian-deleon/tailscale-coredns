@@ -1,17 +1,19 @@
+name: ts-dns
+
 services:
-  tailscale-coredns:
+  ts-dns:
     build:
       context: ..
       dockerfile: docker/Dockerfile
     volumes:
       - tailscale-state:/state
-      - ./hosts:/etc/coredns/custom_hosts:ro              # Optional: Mount hosts file
-      - ./additional.conf:/etc/coredns/additional.conf:ro # Optional: Mount additional CoreDNS configuration
+      - ./ts-dns/hosts/custom_hosts:/etc/ts-dns/hosts/custom_hosts:ro                 # Optional: Mount hosts file
+      - ./ts-dns/additional/additional.conf:/etc/ts-dns/additional/additional.conf:ro # Optional: Mount additional CoreDNS configuration
     environment:
       - TS_AUTHKEY=${TS_AUTHKEY}
       - TS_DOMAIN=${TS_DOMAIN}
       - TS_HOSTNAME=${TS_HOSTNAME}
-      - TS_HOSTS_FILE=${TS_HOSTS_FILE:-/etc/coredns/custom_hosts} # Optional: Path to hosts file
+      - TS_HOSTS_FILE=${TS_HOSTS_FILE:-/etc/ts-dns/hosts/custom_hosts} # Optional: Path to hosts file
       - TS_FORWARD_TO=${TS_FORWARD_TO} # Optional: Forward server
       - TS_EPHEMERAL=${TS_EPHEMERAL}   # Optional: Ephemeral mode
     cap_add:

@@ -1,4 +1,4 @@
-# Sample hosts file for tailscale-coredns
+# Sample hosts file for ts-dns
 # Format: IP_ADDRESS HOSTNAME1 HOSTNAME2 ...
 
 # Example local services
