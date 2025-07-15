@@ -1,4 +1,4 @@
-package tailscale
+package plugin
 
 import (
 	"context"
@@ -52,5 +52,3 @@ func (t *Tailscale) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.M
 	}
 	return dns.RcodeSuccess, nil
 }
-
-func (t *Tailscale) Name() string { return "tailscale" }

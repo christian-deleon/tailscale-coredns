@@ -1,0 +1,54 @@
+# Docker and deployment files
+docker/
+!docker/ts-dns/
+docker-compose.yml
+docker-compose.yaml
+justfile
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Documentation
+README.md
+LICENSE
+*.md
+
+# Git
+.git/
+.gitignore
+
+# GitHub workflows
+.github/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build artifacts (if any)
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test files
+*_test.go
+test/
+tests/
+
+# Temporary files
+*.tmp
+*.temp
