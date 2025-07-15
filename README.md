@@ -41,7 +41,7 @@ The OAuth client requires the following permissions with the tag `tag:tailscale-
    # Custom hosts file
    cp docker/ts-dns/hosts/custom_hosts docker/ts-dns/hosts/custom_hosts.example
    # Edit the file with your custom DNS entries
-   
+
    # Additional configuration
    cp docker/additional.conf.example docker/ts-dns/additional/additional.conf
    # Edit the file with your additional CoreDNS configuration
@@ -226,6 +226,17 @@ dig AAAA hostname.mydomain.com @localhost
 # Custom hosts file entry
 dig serviceA.mydomain.com @localhost
 ```
+
+### Graceful Shutdown
+
+The container automatically handles graceful shutdown when receiving SIGTERM or SIGINT signals:
+
+- **Automatic Logout**: When the container stops, it automatically logs out from Tailscale, removing the device from the network
+- **Process Monitoring**: Monitors both CoreDNS and tailscaled processes, triggering cleanup if either exits unexpectedly
+- **Timeout Handling**: Implements graceful shutdown with timeouts, falling back to force-kill if processes don't respond
+- **Ephemeral Mode**: Works especially well with `TS_EPHEMERAL=true` (default) to ensure devices are automatically removed when offline
+
+This ensures that your Tailscale network stays clean and devices are properly removed when containers are stopped or restarted.
 
 ## Docker Management
 
