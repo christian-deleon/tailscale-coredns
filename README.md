@@ -551,6 +551,8 @@ tailscale ping hostname
 
 ### Planned Features
 
+- **CNAME Support**: Support for CNAME records
+  - Ability to resolve CNAME records to Tailscale devices or a custom domain
 - **Built-in DNS Manager**: Automated health monitoring and IP management for split DNS instances
   - Automatic removal of unhealthy instance IPs from split DNS configuration
   - API request locking to prevent race conditions during concurrent instance startup/shutdown
