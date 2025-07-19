@@ -6,6 +6,7 @@ This project provides a high-availability Go service that integrates a CoreDNS p
 
 - **High Availability**: Full Go service with automatic process management and graceful shutdown
 - **Tailscale Integration**: Automatically resolves Tailscale hostnames to their IP addresses
+- **Multiple Domains**: Support for managing multiple domains in a single instance
 - **Subdomain Tags**: Support for custom subdomains using Tailscale tags (`tag:subdomain-*`)
 - **Hosts File Support**: Works with CoreDNS's built-in `hosts` plugin for custom DNS entries
 - **Forward Server**: Works with CoreDNS's built-in `forward` plugin for unresolved queries
@@ -33,9 +34,9 @@ The plugin supports optional split DNS management for high availability deployme
 
 - Add its own Tailscale IP to the split DNS configuration on startup
 - Remove its IP from the split DNS configuration on shutdown
-- Only manage its own IP, preserving other domains in the split DNS configuration
+- Only manage its own IP, preserving other instances' IPs in the split DNS configuration
 
-This ensures that multiple instances can run simultaneously without conflicts.
+**Note**: Currently, split DNS management uses a read-modify-write pattern that can lead to race conditions when multiple instances start/stop simultaneously. Future versions will implement proper synchronization.
 
 ## Installation
 
@@ -83,24 +84,36 @@ This ensures that multiple instances can run simultaneously without conflicts.
    TS_CLIENT_ID=tskey-client-abc123def456ghi
    TS_CLIENT_SECRET=tskey-client-abc123def456ghi-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-   # Required: Your domain
-   TS_DOMAIN=mydomain.com
+   # Required: Domains for DNS resolution (comma-separated list)
+   # Examples:
+   # TS_DOMAINS=mydomain.com                           # Single domain
+   # TS_DOMAINS=mydomain.com,staging.mydomain.com      # Multiple domains
+   TS_DOMAINS=mydomain.com
 
    # Required: Hostname for this CoreDNS instance
-   TS_HOSTNAME=coredns
+   TS_HOSTNAME=ts-dns
 
    # Optional: Enable split DNS functionality (default: false)
    # When enabled, this instance will add its IP to the split DNS configuration
    TS_ENABLE_SPLIT_DNS=false
 
+   # Optional: Tailnet name (uses "-" for default if not set)
+   # Set this to your Tailscale organization name if needed:
+   # TS_TAILNET=mydomain.com                  # Domain format
+   # TS_TAILNET=name@mydomain.com             # Email format
+   TS_TAILNET=
+
    # Optional: Path to hosts file (default: /etc/ts-dns/hosts/custom_hosts)
    TS_HOSTS_FILE=/etc/ts-dns/hosts/custom_hosts
 
-   # Optional: Forward server for unresolved queries (default: 8.8.8.8)
+   # Optional: Forward server for unresolved queries (default: /etc/resolv.conf)
    TS_FORWARD_TO=8.8.8.8
 
    # Optional: Enable ephemeral mode for Tailscale (default: true)
    TS_EPHEMERAL=true
+
+   # Optional: Refresh interval in seconds (default: 30)
+   TSC_REFRESH_INTERVAL=30
    ```
 
 5. **Start the service**:
@@ -147,8 +160,8 @@ This ensures that multiple instances can run simultaneously without conflicts.
    # Set required environment variables
    export TS_CLIENT_ID="your-client-id"
    export TS_CLIENT_SECRET="your-client-secret"
-   export TS_DOMAIN="your-domain.com"
-   export TS_HOSTNAME="coredns-server"
+   export TS_DOMAINS="your-domain.com"
+   export TS_HOSTNAME="ts-dns"
 
    # Run the service
    ./tailscale-coredns
@@ -160,38 +173,38 @@ This ensures that multiple instances can run simultaneously without conflicts.
 
 - `TS_CLIENT_ID` (required): Tailscale OAuth client ID
 - `TS_CLIENT_SECRET` (required): Tailscale OAuth client secret
-- `TS_DOMAIN` (required): Your domain name for DNS resolution
+- `TS_DOMAINS` (required): Comma-separated list of domains for DNS resolution
+- `TS_DOMAIN` (deprecated): Single domain for DNS resolution (use TS_DOMAINS instead)
 - `TS_HOSTNAME` (required): Hostname for this CoreDNS instance
 - `TS_ENABLE_SPLIT_DNS` (optional): Enable split DNS functionality (default: false)
-- `TS_TAILNET` (optional): Explicit tailnet name (auto-detected if not set). Accepts multiple formats: `tail326daa`, `tail326daa.ts.net`, or `hostname.tail326daa.ts.net`
+- `TS_TAILNET` (optional): Your Tailscale organization name (e.g., `mydomain.com` or `name@mydomain.com`). If not set, uses "-" for default tailnet
 - `TS_HOSTS_FILE` (optional): Path to hosts file for custom DNS entries (default: /etc/ts-dns/hosts/custom_hosts)
-- `TS_FORWARD_TO` (optional): Forward server for unresolved queries (default: 8.8.8.8)
-- `TS_EPHEMERAL` (optional): Enable ephemeral mode for Tailscale (default: true). When set to true, the node will be automatically removed when it goes offline
+- `TS_FORWARD_TO` (optional): Forward server for unresolved queries (default: /etc/resolv.conf)
+- `TS_EPHEMERAL` (optional): Enable ephemeral mode for Tailscale (default: true). When set to true, the node will be automatically removed when it goes offline and the service will logout on shutdown
 - `TSC_REFRESH_INTERVAL` (optional): Refresh interval in seconds (default: 30)
 
 ### Split DNS Configuration
 
 When `TS_ENABLE_SPLIT_DNS` is set to `true`, the plugin will:
 
-1. **On Startup**: Add the current instance's Tailscale IP to the split DNS configuration
-2. **On Shutdown**: Remove the current instance's IP from the split DNS configuration
+1. **On Startup**: Add the current instance's Tailscale IP to the nameserver list for each configured domain
+2. **On Shutdown**: Remove the current instance's IP from the nameserver list for each configured domain
 3. **High Availability**: Multiple instances can run simultaneously, each managing only its own IP
 
 **Requirements for Split DNS**:
 
 - The OAuth client must have `dns:read` and `dns:write` permissions
-- The domain name must be in the format `tailnet.com` (e.g., `mydomain.com`)
+- Each domain must have at least a second-level domain and TLD (e.g., `example.com`)
 
 **Finding Your Tailnet Name**:
 
-If split DNS operations fail with 404 errors, you may need to explicitly set your tailnet name:
+If split DNS operations fail with 404 errors, you may need to explicitly set your tailnet name. The tailnet name is your Tailscale organization name, which can be:
 
-1. Run `tailscale status` on any device in your tailnet
-2. Look for the DNS name (e.g., `hostname.tail326daa.ts.net`)
-3. You can set `TS_TAILNET` to any of these formats (all will be normalized automatically):
-   - `TS_TAILNET=tail326daa` (just the tailnet name)
-   - `TS_TAILNET=tail326daa.ts.net` (full format)
-   - `TS_TAILNET=hostname.tail326daa.ts.net` (hostname format)
+1. **Domain format**: `mydomain.com`
+2. **Email format**: `name@mydomain.com`
+3. **Default**: Use `-` or leave empty for the default tailnet
+
+You can find your tailnet name in the Tailscale admin console or by checking your organization settings.
 
 ### Directory Structure
 
@@ -216,7 +229,7 @@ The plugin supports a simple Corefile configuration:
 
 ```corefile
 . {
-    tailscale mydomain.com
+    tailscale mydomain.com staging.mydomain.com
     hosts /etc/ts-dns/hosts/custom_hosts {
         fallthrough
     }
@@ -250,7 +263,7 @@ You can extend the CoreDNS configuration with additional built-in plugins by mou
    }
    ```
 
-3. **Mount the file** in your docker-compose.yml (already configured):
+3. **Mount the file** in your compose.yml (already configured):
 
    ```yaml
    volumes:
@@ -272,56 +285,124 @@ example.private. {
 
 ## Usage
 
-### Basic DNS Resolution
+### DNS Resolution
 
-Once running, the plugin will automatically resolve:
+Once the service is running, you can resolve Tailscale hostnames:
 
-- **Tailscale hostnames**: `hostname.mydomain.com` → Tailscale IP
-- **IPv4 and IPv6**: Both A and AAAA records are supported
-- **Custom hosts**: Entries from the hosts file
-- **Forwarded queries**: Unresolved queries are forwarded to the configured server
+```bash
+# Resolve a Tailscale hostname
+dig hostname.mydomain.com @localhost
+
+# Resolve with subdomain tags
+dig hostname.subdomain.mydomain.com @localhost
+```
 
 ### Subdomain Tags
 
-The plugin supports custom subdomains using Tailscale tags:
+Devices can be tagged in Tailscale to create custom subdomains:
 
-1. **Add a tag to your Tailscale device**: `tag:subdomain-web-server`
-2. **DNS resolution**: `hostname.web.server.mydomain.com` → Tailscale IP
+1. Tag a device with `tag:subdomain-web-server` in Tailscale
+2. The device will be resolvable at `hostname.web.server.mydomain.com`
 
-The plugin converts hyphens in tag names to dots in the subdomain.
+Tags are converted from hyphens to dots to create the subdomain hierarchy.
 
-### DNS Usage Examples
+### Split DNS Management
+
+When split DNS is enabled, you can manage it using the `splitdns` tool:
 
 ```bash
-# Basic hostname resolution
-dig hostname.mydomain.com @localhost
+# Check split DNS status
+./splitdns -action=status -domains=mydomain.com
 
-# Subdomain tag resolution (device tagged with tag:subdomain-web-server)
-dig hostname.web.server.mydomain.com @localhost
+# Initialize split DNS manually
+./splitdns -action=init -domains=mydomain.com,staging.mydomain.com
 
-# IPv6 resolution
-dig AAAA hostname.mydomain.com @localhost
-
-# Custom hosts file entry
-dig serviceA.mydomain.com @localhost
+# Cleanup split DNS manually
+./splitdns -action=cleanup -domains=mydomain.com
 ```
 
-### Graceful Shutdown
+### High Availability Deployment
 
-The Go service automatically handles graceful shutdown when receiving SIGTERM or SIGINT signals:
+For high availability deployments with split DNS:
 
-- **Automatic Logout**: When the service stops, it automatically logs out from Tailscale, removing the device from the network
-- **Process Management**: Monitors both CoreDNS and tailscaled processes, triggering cleanup if either exits unexpectedly
-- **Split DNS Cleanup**: Automatically removes the instance from split DNS configuration during shutdown
-- **Timeout Handling**: Implements graceful shutdown with timeouts, falling back to force-kill if processes don't respond
-- **Signal Handling**: Proper signal handling for container orchestration (Docker, Kubernetes)
-- **Ephemeral Mode**: Works especially well with `TS_EPHEMERAL=true` (default) to ensure devices are automatically removed when offline
+1. Deploy multiple instances of the service
+2. Set `TS_ENABLE_SPLIT_DNS=true` on each instance
+3. Each instance will add its IP to the split DNS configuration
+4. Tailscale will load balance DNS queries across all registered IPs
+5. When an instance shuts down, it automatically removes its IP
 
-This ensures that your Tailscale network stays clean and devices are properly removed when containers are stopped or restarted.
+**Note**: The `TS_HOSTNAME` value doesn't need to be unique across instances. Tailscale automatically handles the identification and management of each instance's IP address in the split DNS configuration. You can use the same hostname for all instances or different hostnames - it doesn't affect the split DNS functionality.
 
-## Docker Management
+#### Demo Configuration
 
-The project includes a `justfile` for common operations:
+The included `compose.yml` file is configured with 3 replicas for demonstration and testing purposes. For production deployments, comment out the `deploy` section to run a single instance, or deploy across multiple hosts for true high availability.
+
+**Important**: The demo configuration with 3 replicas is **NOT** true high availability because all replicas run on the same host. If the host fails, all instances will be unavailable.
+
+#### Production HA Best Practices
+
+For true high availability in production environments:
+
+1. **Deploy across multiple hosts/servers**: Each instance should run on a separate physical or virtual machine
+2. **Use different availability zones**: Deploy instances across different data centers or cloud availability zones
+3. **Monitor instance health**: Implement health checks
+4. **Use container orchestration**: Consider Kubernetes, or similar for production deployments
+
+**Load Balancing Note**: When using split DNS management (`TS_ENABLE_SPLIT_DNS=true`), Tailscale automatically routes DNS traffic to the registered ts-dns instances. Tailscale queries multiple nameservers sequentially - it only falls back to the next server if the previous one fails to respond (e.g., timeout or connection error), not if it returns a "no such domain" (NXDOMAIN) response. No external load balancer is needed when using split DNS.
+
+If you prefer to self-manage DNS traffic without split DNS, you can use an external load balancer to direct traffic directly to ts-dns instances, but this project is designed to work with Tailscale's split DNS functionality.
+
+For production deployments, deploy the same compose.yml file across multiple hosts. Tailscale will automatically handle the identification and management of each instance's IP address in the split DNS configuration.
+
+## Advanced Configuration
+
+### Corefile Generation
+
+The service automatically generates a Corefile based on your configuration:
+
+```text
+. {
+    tailscale mydomain.com staging.mydomain.com
+    hosts /etc/ts-dns/hosts/custom_hosts {
+        fallthrough
+    }
+    forward . 8.8.8.8
+    log
+    errors
+}
+```
+
+### Additional Configuration
+
+You can add custom CoreDNS configuration by creating a file at `/etc/ts-dns/additional/additional.conf`:
+
+```text
+# Custom server block for internal domain
+internal.local {
+    file /etc/coredns/zones/internal.local
+    log
+}
+```
+
+### Custom Plugin Usage
+
+If you need to use the plugin in a custom CoreDNS build:
+
+```text
+# Corefile
+. {
+    tailscale mydomain.com staging.mydomain.com {
+        # Plugin accepts multiple domains
+    }
+    forward . 8.8.8.8
+    log
+    errors
+}
+```
+
+### Docker Compose Commands
+
+The Docker deployment includes helpful commands via `just`:
 
 ```bash
 # Build the Docker image
@@ -365,7 +446,7 @@ tailscale-coredns/
 │       └── client.go
 ├── docker/                   # Docker deployment files
 │   ├── Dockerfile            # Go-based container
-│   ├── docker-compose.yml
+│   ├── compose.yml
 │   ├── example.env
 │   ├── justfile              # Common commands
 │   └── ts-dns/               # Default configuration files
@@ -402,7 +483,7 @@ tailscale-coredns/
    # Set environment variables
    export TS_CLIENT_ID="your-client-id"
    export TS_CLIENT_SECRET="your-client-secret"
-   export TS_DOMAIN="your-domain.com"
+   export TS_DOMAINS="your-domain.com,staging.your-domain.com"
    export TS_HOSTNAME="test-server"
 
    # Run the service
@@ -413,13 +494,13 @@ tailscale-coredns/
 
    ```bash
    # Check split DNS status
-   ./splitdns -action=status -domain=your-domain.com
+   ./splitdns -action=status -domains=your-domain.com
 
    # Initialize split DNS manually
-   ./splitdns -action=init -domain=your-domain.com
+   ./splitdns -action=init -domains=your-domain.com,staging.your-domain.com
 
    # Cleanup split DNS manually
-   ./splitdns -action=cleanup -domain=your-domain.com
+   ./splitdns -action=cleanup -domains=your-domain.com
    ```
 
 ## Troubleshooting
@@ -441,6 +522,12 @@ tailscale-coredns/
    - Check that devices have the correct tags applied
    - Verify the tag conversion (hyphens become dots)
 
+4. **Split DNS not working**:
+   - Verify `TS_ENABLE_SPLIT_DNS=true` is set
+   - Check that the OAuth client has `dns:read` and `dns:write` permissions
+   - Ensure domains are valid (at least second-level domain + TLD)
+   - Check if `TS_TAILNET` needs to be set explicitly
+
 ### Debug Commands
 
 ```bash
@@ -455,7 +542,20 @@ docker logs tailscale-coredns
 
 # Check Tailscale connectivity
 tailscale ping hostname
+
+# View split DNS configuration (if enabled)
+./splitdns -action=status -domains=mydomain.com
 ```
+
+## Roadmap
+
+### Planned Features
+
+- **Built-in DNS Manager**: Automated health monitoring and IP management for split DNS instances
+  - Automatic removal of unhealthy instance IPs from split DNS configuration
+  - API request locking to prevent race conditions during concurrent instance startup/shutdown
+  - Health check integration with container orchestration platforms
+  - Improved reliability for high-availability deployments
 
 ## Contributing
 
