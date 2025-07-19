@@ -20,10 +20,8 @@ type Client struct {
 	httpClient   *http.Client
 }
 
-// SplitDNS represents the split DNS configuration
-type SplitDNS struct {
-	Domains []string `json:"domains"`
-}
+// SplitDNSConfig represents the split DNS configuration as a map from domains to nameservers
+type SplitDNSConfig map[string][]string
 
 // TokenResponse represents the OAuth token response
 type TokenResponse struct {
@@ -37,6 +35,11 @@ func NewClient(clientID, clientSecret, tailnet string) *Client {
 	// Set environment variables for Tailscale CLI OAuth authentication
 	os.Setenv("TS_CLIENT_ID", clientID)
 	os.Setenv("TS_CLIENT_SECRET", clientSecret)
+
+	// Use "-" for default tailnet if not specified
+	if tailnet == "" {
+		tailnet = "-"
+	}
 
 	return &Client{
 		clientID:     clientID,
@@ -83,7 +86,7 @@ func (a *Client) getAccessToken(ctx context.Context) (string, error) {
 }
 
 // GetSplitDNS retrieves the current split DNS configuration
-func (a *Client) GetSplitDNS(ctx context.Context) (*SplitDNS, error) {
+func (a *Client) GetSplitDNS(ctx context.Context) (SplitDNSConfig, error) {
 	token, err := a.getAccessToken(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get access token: %w", err)
@@ -105,23 +108,23 @@ func (a *Client) GetSplitDNS(ctx context.Context) (*SplitDNS, error) {
 
 	if resp.StatusCode == http.StatusNotFound {
 		// No split DNS configured yet
-		return &SplitDNS{Domains: []string{}}, nil
+		return make(SplitDNSConfig), nil
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("get split DNS failed with status: %d", resp.StatusCode)
 	}
 
-	var splitDNS SplitDNS
+	var splitDNS SplitDNSConfig
 	if err := json.NewDecoder(resp.Body).Decode(&splitDNS); err != nil {
 		return nil, fmt.Errorf("failed to decode split DNS response: %w", err)
 	}
 
-	return &splitDNS, nil
+	return splitDNS, nil
 }
 
-// UpdateSplitDNS updates the split DNS configuration
-func (a *Client) UpdateSplitDNS(ctx context.Context, splitDNS *SplitDNS) error {
+// PatchSplitDNS performs a partial update of split DNS configuration
+func (a *Client) PatchSplitDNS(ctx context.Context, updates SplitDNSConfig) error {
 	token, err := a.getAccessToken(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get access token: %w", err)
@@ -129,9 +132,9 @@ func (a *Client) UpdateSplitDNS(ctx context.Context, splitDNS *SplitDNS) error {
 
 	url := fmt.Sprintf("https://api.tailscale.com/api/v2/tailnet/%s/dns/split-dns", a.tailnet)
 
-	body, err := json.Marshal(splitDNS)
+	body, err := json.Marshal(updates)
 	if err != nil {
-		return fmt.Errorf("failed to marshal split DNS: %w", err)
+		return fmt.Errorf("failed to marshal split DNS updates: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "PATCH", url, bytes.NewReader(body))
@@ -144,109 +147,192 @@ func (a *Client) UpdateSplitDNS(ctx context.Context, splitDNS *SplitDNS) error {
 
 	resp, err := a.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to update split DNS: %w", err)
+		return fmt.Errorf("failed to patch split DNS: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("update split DNS failed with status: %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("patch split DNS failed with status: %d", resp.StatusCode)
 	}
 
 	return nil
 }
 
-// AddDomainToSplitDNS adds a domain to the split DNS configuration
-func (a *Client) AddDomainToSplitDNS(ctx context.Context, domain string) error {
-	splitDNS, err := a.GetSplitDNS(ctx)
+// PutSplitDNS replaces the entire split DNS configuration
+func (a *Client) PutSplitDNS(ctx context.Context, config SplitDNSConfig) error {
+	token, err := a.getAccessToken(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get access token: %w", err)
+	}
+
+	url := fmt.Sprintf("https://api.tailscale.com/api/v2/tailnet/%s/dns/split-dns", a.tailnet)
+
+	body, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal split DNS config: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := a.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to put split DNS: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("put split DNS failed with status: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// AddIPToDomains adds an IP to the specified domains in split DNS
+func (a *Client) AddIPToDomains(ctx context.Context, domains []string, ip string) error {
+	// Get current configuration
+	currentConfig, err := a.GetSplitDNS(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get current split DNS: %w", err)
 	}
 
-	// Check if domain already exists
-	for _, existingDomain := range splitDNS.Domains {
-		if existingDomain == domain {
-			return nil // Domain already exists
+	// Prepare updates
+	updates := make(SplitDNSConfig)
+
+	for _, domain := range domains {
+		nameservers := currentConfig[domain]
+
+		// Check if IP already exists
+		found := false
+		for _, ns := range nameservers {
+			if ns == ip {
+				found = true
+				break
+			}
+		}
+
+		// Add IP if not found
+		if !found {
+			nameservers = append(nameservers, ip)
+			updates[domain] = nameservers
 		}
 	}
 
-	// Add the new domain
-	splitDNS.Domains = append(splitDNS.Domains, domain)
+	// Apply updates if any
+	if len(updates) > 0 {
+		return a.PatchSplitDNS(ctx, updates)
+	}
 
-	return a.UpdateSplitDNS(ctx, splitDNS)
+	return nil
 }
 
-// RemoveDomainFromSplitDNS removes a domain from the split DNS configuration
-func (a *Client) RemoveDomainFromSplitDNS(ctx context.Context, domain string) error {
-	splitDNS, err := a.GetSplitDNS(ctx)
+// RemoveIPFromDomains removes an IP from the specified domains in split DNS
+func (a *Client) RemoveIPFromDomains(ctx context.Context, domains []string, ip string) error {
+	// Get current configuration
+	currentConfig, err := a.GetSplitDNS(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get current split DNS: %w", err)
 	}
 
-	// Find and remove the domain
-	var newDomains []string
-	for _, existingDomain := range splitDNS.Domains {
-		if existingDomain != domain {
-			newDomains = append(newDomains, existingDomain)
+	// Prepare updates
+	updates := make(SplitDNSConfig)
+
+	for _, domain := range domains {
+		nameservers := currentConfig[domain]
+
+		// Filter out the IP
+		var newNameservers []string
+		for _, ns := range nameservers {
+			if ns != ip {
+				newNameservers = append(newNameservers, ns)
+			}
+		}
+
+		// Only update if IP was actually removed
+		if len(newNameservers) != len(nameservers) {
+			if len(newNameservers) == 0 {
+				// Use null to clear the domain if no nameservers left
+				updates[domain] = nil
+			} else {
+				updates[domain] = newNameservers
+			}
 		}
 	}
 
-	splitDNS.Domains = newDomains
-
-	return a.UpdateSplitDNS(ctx, splitDNS)
-}
-
-// IsDomainInSplitDNS checks if a domain is currently in the split DNS configuration
-func (a *Client) IsDomainInSplitDNS(ctx context.Context, domain string) (bool, error) {
-	splitDNS, err := a.GetSplitDNS(ctx)
-	if err != nil {
-		return false, fmt.Errorf("failed to get current split DNS: %w", err)
+	// Apply updates if any
+	if len(updates) > 0 {
+		return a.PatchSplitDNS(ctx, updates)
 	}
 
-	for _, existingDomain := range splitDNS.Domains {
-		if existingDomain == domain {
-			return true, nil
-		}
-	}
-
-	return false, nil
+	return nil
 }
 
-// GetTailnetFromEnv extracts the tailnet name from the TS_DOMAIN environment variable
-// or uses TS_TAILNET if explicitly set
+// GetTailnetFromEnv gets the tailnet from environment variables
 func GetTailnetFromEnv() (string, error) {
 	// Check if tailnet is explicitly set first
 	if tailnet := os.Getenv("TS_TAILNET"); tailnet != "" {
-		return normalizeTailnetName(tailnet), nil
+		return strings.TrimSpace(tailnet), nil
 	}
 
-	domain := os.Getenv("TS_DOMAIN")
-	if domain == "" {
-		return "", fmt.Errorf("TS_DOMAIN environment variable is required")
-	}
-
-	// Extract tailnet from domain (e.g., "mydomain.com" -> "mydomain")
-	// Note: This may not always be correct. Set TS_TAILNET explicitly if needed.
-	parts := strings.Split(domain, ".")
-	if len(parts) < 2 {
-		return "", fmt.Errorf("invalid domain format: %s", domain)
-	}
-
-	return parts[0], nil
+	// Return empty string to use default "-"
+	return "", nil
 }
 
-// normalizeTailnetName ensures we have just the tailnet name without .ts.net suffix
-func normalizeTailnetName(tailnet string) string {
-	// Remove .ts.net suffix if present
-	if strings.HasSuffix(tailnet, ".ts.net") {
-		tailnet = strings.TrimSuffix(tailnet, ".ts.net")
+// ValidateDomain validates that a domain has at least a second-level domain and TLD
+func ValidateDomain(domain string) error {
+	domain = strings.TrimSpace(domain)
+	if domain == "" {
+		return fmt.Errorf("domain cannot be empty")
 	}
-	
-	// If it's in format "hostname.tailnet.ts.net", extract just the tailnet part
-	parts := strings.Split(tailnet, ".")
-	if len(parts) >= 2 {
-		// Return the last part which should be the tailnet name
-		return parts[len(parts)-1]
+
+	// Remove trailing dot if present
+	domain = strings.TrimSuffix(domain, ".")
+
+	parts := strings.Split(domain, ".")
+	if len(parts) < 2 {
+		return fmt.Errorf("domain must have at least a second-level domain and TLD (e.g., example.com)")
 	}
-	
-	return tailnet
+
+	// Check each part is not empty
+	for i, part := range parts {
+		if part == "" {
+			return fmt.Errorf("domain has empty part at position %d", i)
+		}
+	}
+
+	return nil
+}
+
+// ParseDomains parses a comma-separated list of domains and validates each one
+func ParseDomains(domainsStr string) ([]string, error) {
+	if domainsStr == "" {
+		return nil, fmt.Errorf("domains string cannot be empty")
+	}
+
+	parts := strings.Split(domainsStr, ",")
+	domains := make([]string, 0, len(parts))
+
+	for _, part := range parts {
+		domain := strings.TrimSpace(part)
+		if domain == "" {
+			continue
+		}
+
+		if err := ValidateDomain(domain); err != nil {
+			return nil, fmt.Errorf("invalid domain '%s': %w", domain, err)
+		}
+
+		domains = append(domains, domain)
+	}
+
+	if len(domains) == 0 {
+		return nil, fmt.Errorf("no valid domains found")
+	}
+
+	return domains, nil
 }

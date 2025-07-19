@@ -31,12 +31,8 @@ func (m *SplitDNSManager) Initialize() error {
 
 	clog.Info("Initializing split DNS...")
 
-	// Wait for Tailscale to be ready
-	if err := m.waitForTailscale(); err != nil {
-		return fmt.Errorf("failed to wait for Tailscale: %w", err)
-	}
-
 	// Add current node to split DNS
+	// Note: Tailscale connection should already be established by the main process
 	if err := m.ts.AddToSplitDNS(); err != nil {
 		return fmt.Errorf("failed to add to split DNS: %w", err)
 	}
@@ -104,6 +100,6 @@ func (m *SplitDNSManager) RunWithSignalHandling() error {
 }
 
 // GetSplitDNSStatus returns the current split DNS status
-func (m *SplitDNSManager) GetSplitDNSStatus() (bool, string) {
-	return m.ts.enableSplitDNS, m.ts.splitDNSDomain
+func (m *SplitDNSManager) GetSplitDNSStatus() (bool, []string) {
+	return m.ts.enableSplitDNS, m.ts.splitDNSDomains
 }

@@ -5,6 +5,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"tailscale-coredns/pkg/api"
 )
 
 // Config holds all configuration for the tailscale-coredns service
@@ -14,7 +16,7 @@ type Config struct {
 	ClientSecret string
 
 	// DNS configuration
-	Domain      string
+	Domains     []string // Changed from Domain to Domains (plural)
 	Hostname    string
 	HostsFile   string
 	ForwardTo   string
@@ -45,11 +47,23 @@ func LoadFromEnv() (*Config, error) {
 		return nil, fmt.Errorf("TS_CLIENT_ID and TS_CLIENT_SECRET are required")
 	}
 
-	// Required: Domain and hostname
-	config.Domain = os.Getenv("TS_DOMAIN")
-	if config.Domain == "" {
-		return nil, fmt.Errorf("TS_DOMAIN is required")
+	// Handle domains - check TS_DOMAINS first, fall back to TS_DOMAIN for backward compatibility
+	domainsStr := os.Getenv("TS_DOMAINS")
+	if domainsStr == "" {
+		// Fall back to TS_DOMAIN for backward compatibility
+		domain := os.Getenv("TS_DOMAIN")
+		if domain == "" {
+			return nil, fmt.Errorf("TS_DOMAINS or TS_DOMAIN is required")
+		}
+		domainsStr = domain
 	}
+
+	// Parse and validate domains
+	domains, err := api.ParseDomains(domainsStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid domains: %w", err)
+	}
+	config.Domains = domains
 
 	config.Hostname = os.Getenv("TS_HOSTNAME")
 	if config.Hostname == "" {
@@ -74,12 +88,13 @@ func LoadFromEnv() (*Config, error) {
 
 	// Optional: Split DNS
 	config.EnableSplitDNS = strings.ToLower(os.Getenv("TS_ENABLE_SPLIT_DNS")) == "true"
-	
-	// Optional: Tailnet name (auto-detected if not set)
-	if tailnet := os.Getenv("TS_TAILNET"); tailnet != "" {
-		// Normalize the tailnet name to handle cases like "tailXYZ.ts.net" -> "tailXYZ"
-		config.Tailnet = normalizeTailnetName(tailnet)
+
+	// Tailnet - use GetTailnetFromEnv which handles the "-" default
+	tailnet, err := api.GetTailnetFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tailnet: %w", err)
 	}
+	config.Tailnet = tailnet
 
 	// Optional: Ephemeral mode
 	ephemeralStr := os.Getenv("TS_EPHEMERAL")
@@ -112,13 +127,12 @@ func fileExists(filename string) bool {
 	return !os.IsNotExist(err)
 }
 
-// GetTailnet extracts the tailnet name from the domain
-func (c *Config) GetTailnet() (string, error) {
-	parts := strings.Split(c.Domain, ".")
-	if len(parts) < 2 {
-		return "", fmt.Errorf("invalid domain format: %s", c.Domain)
+// GetPrimaryDomain returns the first domain in the list (for backward compatibility)
+func (c *Config) GetPrimaryDomain() string {
+	if len(c.Domains) > 0 {
+		return c.Domains[0]
 	}
-	return parts[0], nil
+	return ""
 }
 
 // Validate ensures all required configuration is present and valid
@@ -131,8 +145,8 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("TS_CLIENT_SECRET is required")
 	}
 
-	if c.Domain == "" {
-		return fmt.Errorf("TS_DOMAIN is required")
+	if len(c.Domains) == 0 {
+		return fmt.Errorf("at least one domain is required")
 	}
 
 	if c.Hostname == "" {
@@ -151,19 +165,10 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// normalizeTailnetName ensures we have just the tailnet name without .ts.net suffix
+// normalizeTailnetName processes the organization name used to create the Tailscale account
 func normalizeTailnetName(tailnet string) string {
-	// Remove .ts.net suffix if present
-	if strings.HasSuffix(tailnet, ".ts.net") {
-		tailnet = strings.TrimSuffix(tailnet, ".ts.net")
-	}
-	
-	// If it's in format "hostname.tailnet.ts.net", extract just the tailnet part
-	parts := strings.Split(tailnet, ".")
-	if len(parts) >= 2 {
-		// Return the last part which should be the tailnet name
-		return parts[len(parts)-1]
-	}
-	
+	// Trim any whitespace
+	tailnet = strings.TrimSpace(tailnet)
+
 	return tailnet
 }

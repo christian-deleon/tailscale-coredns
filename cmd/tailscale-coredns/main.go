@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"tailscale-coredns/internal/config"
 	"tailscale-coredns/internal/plugin"
@@ -49,13 +50,13 @@ func main() {
 	}
 
 	log.Printf("Configuration loaded:")
-	log.Printf("  Domain: %s", cfg.Domain)
+	log.Printf("  Domains: %s", strings.Join(cfg.Domains, ", "))
 	log.Printf("  Hostname: %s", cfg.Hostname)
 	log.Printf("  Split DNS: %t", cfg.EnableSplitDNS)
-	if cfg.Tailnet != "" {
+	if cfg.Tailnet != "" && cfg.Tailnet != "-" {
 		log.Printf("  Tailnet: %s", cfg.Tailnet)
 	} else {
-		log.Printf("  Tailnet: auto-detect")
+		log.Printf("  Tailnet: %s (default)", cfg.Tailnet)
 	}
 	log.Printf("  Ephemeral: %t", cfg.Ephemeral)
 	log.Printf("  Hosts file: %s", cfg.HostsFile)
@@ -91,29 +92,6 @@ func main() {
 		log.Fatalf("Failed to wait for tailscaled socket: %v", err)
 	}
 
-	// Initialize split DNS if enabled
-	var splitDNSManager *plugin.SplitDNSManager
-	if cfg.EnableSplitDNS {
-		log.Println("Initializing split DNS...")
-
-		// Create plugin instance for split DNS
-		ts, err := plugin.New(cfg.Domain)
-		if err != nil {
-			log.Fatalf("Failed to create plugin instance: %v", err)
-		}
-
-		splitDNSManager = plugin.NewSplitDNSManager(ts)
-
-		// Wait for Tailscale to be ready before initializing split DNS
-		if err := processManager.WaitForTailscaleConnection(); err != nil {
-			log.Printf("Warning: Tailscale connection not ready, continuing without split DNS initialization: %v", err)
-		} else {
-			if err := splitDNSManager.Initialize(); err != nil {
-				log.Fatalf("Failed to initialize split DNS: %v", err)
-			}
-		}
-	}
-
 	// Authenticate with Tailscale
 	if err := processManager.AuthenticateTailscale(); err != nil {
 		log.Fatalf("Failed to authenticate with Tailscale: %v", err)
@@ -122,6 +100,27 @@ func main() {
 	// Wait for Tailscale connection
 	if err := processManager.WaitForTailscaleConnection(); err != nil {
 		log.Fatalf("Failed to establish Tailscale connection: %v", err)
+	}
+
+	log.Println("Tailscale connection established successfully")
+
+	// Initialize split DNS if enabled (after authentication and connection)
+	var splitDNSManager *plugin.SplitDNSManager
+	if cfg.EnableSplitDNS {
+		log.Println("Initializing split DNS...")
+
+		// Create plugin instance for split DNS
+		ts, err := plugin.New(cfg.Domains)
+		if err != nil {
+			log.Fatalf("Failed to create plugin instance: %v", err)
+		}
+
+		splitDNSManager = plugin.NewSplitDNSManager(ts)
+
+		// Initialize split DNS now that Tailscale is connected
+		if err := splitDNSManager.Initialize(); err != nil {
+			log.Fatalf("Failed to initialize split DNS: %v", err)
+		}
 	}
 
 	// Start CoreDNS
@@ -133,16 +132,17 @@ func main() {
 	log.Println("All services started successfully")
 
 	// Set up cleanup function that runs even if the process is terminated
-	if splitDNSManager != nil {
-		defer func() {
+	defer func() {
+		// Cleanup split DNS if enabled
+		if splitDNSManager != nil {
 			log.Println("Executing split DNS cleanup...")
 			if err := splitDNSManager.Cleanup(); err != nil {
 				log.Printf("Error during split DNS cleanup: %v", err)
 			} else {
 				log.Println("Split DNS cleanup completed successfully")
 			}
-		}()
-	}
+		}
+	}()
 
 	// Run with signal handling
 	log.Println("Service is ready and waiting for connections...")
@@ -159,10 +159,11 @@ func printUsage() {
 Environment Variables:
   TS_CLIENT_ID         Tailscale OAuth client ID (required)
   TS_CLIENT_SECRET     Tailscale OAuth client secret (required)
-  TS_DOMAIN            Domain for DNS resolution (required)
+  TS_DOMAINS           Comma-separated list of domains for DNS resolution (required)
+  TS_DOMAIN            Single domain for DNS resolution (deprecated, use TS_DOMAINS)
   TS_HOSTNAME          Hostname for this instance (required)
   TS_ENABLE_SPLIT_DNS  Enable split DNS management (default: false)
-  TS_TAILNET           Explicit tailnet name (optional, auto-detected if not set)
+  TS_TAILNET           Explicit tailnet name (optional, uses "-" for default if not set)
   TS_HOSTS_FILE        Path to custom hosts file (optional)
   TS_FORWARD_TO        Forward server for unresolved queries (default: /etc/resolv.conf)
   TS_EPHEMERAL         Enable ephemeral mode (default: true)

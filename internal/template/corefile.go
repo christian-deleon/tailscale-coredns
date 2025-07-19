@@ -10,7 +10,7 @@ import (
 )
 
 const corefileTemplate = `. {
-    tailscale {{ .Domain }}
+    tailscale {{ .DomainsString }}
 {{- if .HostsFile }}
     hosts {{ .HostsFile }} {
         fallthrough
@@ -29,7 +29,7 @@ const corefileTemplate = `. {
 
 // CorefileData represents the data used to generate the Corefile
 type CorefileData struct {
-	Domain           string
+	DomainsString    string
 	HostsFile        string
 	ForwardTo        string
 	AdditionalConfig string
@@ -54,8 +54,11 @@ func NewGenerator() (*Generator, error) {
 
 // GenerateCorefile generates a Corefile based on the provided configuration
 func (g *Generator) GenerateCorefile(cfg *config.Config) (string, error) {
+	// Join domains with spaces for the tailscale plugin line
+	domainsString := strings.Join(cfg.Domains, " ")
+	
 	data := CorefileData{
-		Domain:           cfg.Domain,
+		DomainsString:    domainsString,
 		HostsFile:        cfg.HostsFile,
 		ForwardTo:        cfg.ForwardTo,
 		AdditionalConfig: strings.TrimSpace(cfg.AdditionalConfig),
