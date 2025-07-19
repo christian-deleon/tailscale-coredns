@@ -2,11 +2,13 @@ package process
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -133,15 +135,52 @@ func (m *Manager) WaitForTailscaleConnection() error {
 	deadline := time.Now().Add(timeout)
 
 	for time.Now().Before(deadline) {
+		// First check if tailscale status command works
 		cmd := exec.CommandContext(m.ctx, "tailscale", "--socket=/run/tailscale/tailscaled.sock", "status")
-		if err := cmd.Run(); err == nil {
-			log.Println("Tailscale connection established")
+		if err := cmd.Run(); err != nil {
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		// Now check if we have an IP address assigned
+		// Use tailscale status --json to get detailed status
+		statusCmd := exec.CommandContext(m.ctx, "tailscale", "--socket=/run/tailscale/tailscaled.sock", "status", "--json")
+		output, err := statusCmd.Output()
+		if err != nil {
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		// Parse the JSON output to check for IP addresses
+		var status struct {
+			Self struct {
+				TailscaleIPs []string `json:"TailscaleIPs"`
+			} `json:"Self"`
+		}
+
+		if err := json.Unmarshal(output, &status); err != nil {
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		// Check if we have at least one IPv4 address
+		hasIPv4 := false
+		for _, ip := range status.Self.TailscaleIPs {
+			if strings.Contains(ip, ".") { // Simple check for IPv4 (contains dots)
+				hasIPv4 = true
+				break
+			}
+		}
+
+		if hasIPv4 {
+			log.Println("Tailscale connection established with IP address")
 			return nil
 		}
+
 		time.Sleep(1 * time.Second)
 	}
 
-	return fmt.Errorf("timeout waiting for Tailscale connection")
+	return fmt.Errorf("timeout waiting for Tailscale connection with IP address")
 }
 
 // StartCoreDNS starts the CoreDNS server with the specified config file
@@ -196,12 +235,10 @@ func (m *Manager) LogoutTailscale() error {
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		log.Printf("Error during Tailscale logout: %v", err)
-		// Don't return error here to continue with other cleanup
-	} else {
-		log.Println("Tailscale logout completed successfully")
+		return fmt.Errorf("failed to logout from Tailscale: %w", err)
 	}
 
+	log.Println("Tailscale logout completed successfully")
 	return nil
 }
 
@@ -213,16 +250,12 @@ func (m *Manager) Stop() error {
 	log.Println("Cancelling process manager context...")
 	m.cancel()
 
-	// Logout from Tailscale first
-	log.Println("Step 1: Logging out from Tailscale...")
-	m.LogoutTailscale()
-
 	m.mu.RLock()
 	processes := make([]*Process, len(m.processes))
 	copy(processes, m.processes)
 	m.mu.RUnlock()
 
-	log.Printf("Step 2: Sending TERM signals to %d managed processes...", len(processes))
+	log.Printf("Sending TERM signals to %d managed processes...", len(processes))
 
 	// Send TERM signal to all running processes
 	for _, process := range processes {
@@ -239,7 +272,7 @@ func (m *Manager) Stop() error {
 	}
 
 	// Wait for graceful shutdown with timeout
-	log.Println("Step 3: Waiting for processes to shut down gracefully...")
+	log.Println("Waiting for processes to shut down gracefully...")
 	timeout := 10 * time.Second
 	deadline := time.Now().Add(timeout)
 
@@ -267,7 +300,7 @@ func (m *Manager) Stop() error {
 	}
 
 	if !gracefulShutdown {
-		log.Printf("Step 4: Graceful shutdown timeout reached, force killing remaining processes...")
+		log.Printf("Graceful shutdown timeout reached, force killing remaining processes...")
 		// Force kill any remaining processes
 		for _, process := range processes {
 			process.mu.RLock()
@@ -303,6 +336,17 @@ func (m *Manager) RunWithSignalHandling() error {
 
 	log.Println("Beginning shutdown sequence...")
 
+	// Logout from Tailscale if ephemeral mode is enabled
+	// Do this BEFORE stopping processes so Tailscale can communicate with control server
+	if m.config.Ephemeral {
+		log.Println("Ephemeral mode enabled, logging out from Tailscale before stopping processes...")
+		if err := m.LogoutTailscale(); err != nil {
+			log.Printf("Error during Tailscale logout: %v", err)
+		} else {
+			log.Println("Successfully logged out from Tailscale")
+		}
+	}
+
 	// Stop all processes
 	if err := m.Stop(); err != nil {
 		log.Printf("Error during shutdown: %v", err)
@@ -328,4 +372,9 @@ func (m *Manager) GetRunningProcesses() []string {
 	}
 
 	return running
+}
+
+// GetContext returns the manager's context
+func (m *Manager) GetContext() context.Context {
+	return m.ctx
 }

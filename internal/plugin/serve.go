@@ -9,13 +9,21 @@ import (
 	"github.com/miekg/dns"
 )
 
-// ServeDNS handles DNS requests for the Tailscale domain.
+// ServeDNS handles DNS requests for the Tailscale domains.
 func (t *Tailscale) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
 	queryName := state.Name()
 
-	// Check Tailscale domain
-	if !strings.HasSuffix(queryName, t.Domain+".") {
+	// Check if query is for any of our Tailscale domains
+	matchesDomain := false
+	for _, domain := range t.Domains {
+		if strings.HasSuffix(queryName, domain+".") {
+			matchesDomain = true
+			break
+		}
+	}
+
+	if !matchesDomain {
 		return plugin.NextOrFailure(t.Name(), t.Next, ctx, w, r)
 	}
 

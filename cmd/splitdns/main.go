@@ -4,14 +4,17 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"strings"
 
 	"tailscale-coredns/internal/plugin"
+	"tailscale-coredns/pkg/api"
 )
 
 func main() {
 	var (
-		action = flag.String("action", "", "Action to perform: init, cleanup, or status")
-		domain = flag.String("domain", "", "Domain for split DNS")
+		action  = flag.String("action", "", "Action to perform: init, cleanup, or status")
+		domains = flag.String("domains", "", "Comma-separated list of domains for split DNS")
+		domain  = flag.String("domain", "", "Single domain for split DNS (deprecated, use -domains)")
 	)
 	flag.Parse()
 
@@ -19,12 +22,24 @@ func main() {
 		log.Fatal("Action is required: init, cleanup, or status")
 	}
 
-	if *domain == "" {
-		log.Fatal("Domain is required")
+	// Handle domains parameter - check -domains first, fall back to -domain
+	domainsStr := *domains
+	if domainsStr == "" && *domain != "" {
+		domainsStr = *domain
+	}
+
+	if domainsStr == "" {
+		log.Fatal("Domains are required (use -domains)")
+	}
+
+	// Parse domains
+	parsedDomains, err := api.ParseDomains(domainsStr)
+	if err != nil {
+		log.Fatalf("Failed to parse domains: %v", err)
 	}
 
 	// Create Tailscale plugin instance
-	ts, err := plugin.New(*domain)
+	ts, err := plugin.New(parsedDomains)
 	if err != nil {
 		log.Fatalf("Failed to create Tailscale plugin: %v", err)
 	}
@@ -46,9 +61,9 @@ func main() {
 		fmt.Println("Split DNS cleanup completed")
 
 	case "status":
-		enabled, domain := manager.GetSplitDNSStatus()
+		enabled, domains := manager.GetSplitDNSStatus()
 		fmt.Printf("Split DNS enabled: %t\n", enabled)
-		fmt.Printf("Domain: %s\n", domain)
+		fmt.Printf("Domains: %s\n", strings.Join(domains, ", "))
 
 	default:
 		log.Fatalf("Unknown action: %s", *action)
