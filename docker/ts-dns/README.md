@@ -47,8 +47,12 @@ example.private. {
 
 1. **Custom Hosts**: Place your custom DNS entries in `hosts/custom_hosts`
 2. **Additional Plugins**: Configure additional CoreDNS plugins in `additional/additional.conf`
-3. **Docker Compose**: The docker-compose.yml file automatically mounts these files to the correct locations
+3. **Docker Compose**: The compose.yml file automatically mounts these files to the correct locations
 
 ## File Permissions
 
 All files should be readable by the CoreDNS process. The Docker container mounts these files as read-only (`:ro`) for security.
+
+## Deployment Considerations
+
+The included `compose.yml` file is configured with 3 replicas for demonstration and testing purposes. However, this is **NOT** true high availability since all replicas run on the same host. For production deployments, comment out the `deploy` section to run a single instance, or refer to the [High Availability Deployment section](../../README.md#high-availability-deployment) in the main README for best practices.
