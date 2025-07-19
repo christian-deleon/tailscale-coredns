@@ -12,9 +12,9 @@ services:
     environment:
       - TS_CLIENT_ID=${TS_CLIENT_ID}
       - TS_CLIENT_SECRET=${TS_CLIENT_SECRET}
-      - TS_DOMAIN=${TS_DOMAIN}
+      - TS_DOMAINS=${TS_DOMAINS}
       - TS_HOSTNAME=${TS_HOSTNAME}
-      - TS_TAILNET=${TS_TAILNET}       # Optional: Explicit tailnet name (auto-detected if not set)
+      - TS_TAILNET=${TS_TAILNET}       # Required for split DNS: Your tailnet name
       - TS_HOSTS_FILE=${TS_HOSTS_FILE:-/etc/ts-dns/hosts/custom_hosts} # Optional: Path to hosts file
       - TS_FORWARD_TO=${TS_FORWARD_TO} # Optional: Forward server
       - TS_EPHEMERAL=${TS_EPHEMERAL}   # Optional: Ephemeral mode
@@ -23,8 +23,9 @@ services:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
-    ports:
-      - "53:53/udp"
+    deploy:
+      mode: replicated
+      replicas: 3  # Demo/testing configuration - not true HA since all replicas run on same host
 
 volumes:
   tailscale-state:
