@@ -36,7 +36,7 @@ RUN git clone https://github.com/coredns/coredns.git && \
     go build -o coredns .
 
 # Runtime stage
-FROM alpine:3.18
+FROM alpine:3.22
 
 # Install all packages and create directories in a single layer
 RUN apk add --no-cache \
