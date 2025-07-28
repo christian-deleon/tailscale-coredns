@@ -8,6 +8,7 @@ services:
     volumes:
       - tailscale-state:/state
       - ./ts-dns/hosts/custom_hosts:/etc/ts-dns/hosts/custom_hosts:ro # Optional: Mount hosts file
+      - ./ts-dns/rewrite/rewrite.conf:/etc/ts-dns/rewrite/rewrite.conf:ro # Optional: Mount rewrite rules file
       # - ./ts-dns/additional/additional.conf:/etc/ts-dns/additional/additional.conf:ro # Optional: Mount additional CoreDNS configuration (disabled for development)
     environment:
       - TS_CLIENT_ID=${TS_CLIENT_ID}
@@ -16,6 +17,7 @@ services:
       - TS_HOSTNAME=${TS_HOSTNAME}
       - TS_TAILNET=${TS_TAILNET}       # Required for split DNS: Your tailnet name
       - TS_HOSTS_FILE=${TS_HOSTS_FILE:-/etc/ts-dns/hosts/custom_hosts} # Optional: Path to hosts file
+      - TS_REWRITE_FILE=${TS_REWRITE_FILE:-/etc/ts-dns/rewrite/rewrite.conf} # Optional: Path to rewrite rules file
       - TS_FORWARD_TO=${TS_FORWARD_TO} # Optional: Forward server
       - TS_EPHEMERAL=${TS_EPHEMERAL}   # Optional: Ephemeral mode
       - TS_ENABLE_SPLIT_DNS=${TS_ENABLE_SPLIT_DNS} # Optional: Enable split DNS functionality
@@ -23,9 +25,9 @@ services:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
-    deploy:
-      mode: replicated
-      replicas: 3  # Demo/testing configuration - not true HA since all replicas run on same host
+    # deploy:
+    #   mode: replicated
+    #   replicas: 3  # Demo/testing configuration - not true HA since all replicas run on same host
 
 volumes:
   tailscale-state:
