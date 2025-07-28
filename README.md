@@ -76,6 +76,26 @@ The plugin supports optional split DNS management for high availability deployme
    192.168.1.102    serviceC.mydomain.com
    ```
 
+   **Rewrite Rules Format**: The rewrite file uses CoreDNS rewrite plugin syntax:
+
+   ```text
+   # Rewrite rules for CoreDNS
+   # Each line should contain a rewrite rule in the format expected by CoreDNS rewrite plugin
+   # Lines starting with # are comments and will be ignored
+
+   # Example: Rewrite www.example.com to example.com
+   name www.example.com example.com
+
+   # Example: Rewrite with regex pattern
+   name regex (.*)\.example\.com {1}.example.com
+
+   # Example: Rewrite with response rewrite
+   answer name example.com www.example.com
+
+   # Example: Rewrite with CNAME
+   name example.com cname.example.com
+   ```
+
 4. **Edit the environment file** with your Tailscale credentials:
 
    ```bash
@@ -105,6 +125,9 @@ The plugin supports optional split DNS management for high availability deployme
 
    # Optional: Path to hosts file (default: /etc/ts-dns/hosts/custom_hosts)
    TS_HOSTS_FILE=/etc/ts-dns/hosts/custom_hosts
+
+   # Optional: Path to rewrite rules file (default: /etc/ts-dns/rewrite/rewrite.conf)
+   TS_REWRITE_FILE=/etc/ts-dns/rewrite/rewrite.conf
 
    # Optional: Forward server for unresolved queries (default: /etc/resolv.conf)
    TS_FORWARD_TO=8.8.8.8
@@ -179,6 +202,7 @@ The plugin supports optional split DNS management for high availability deployme
 - `TS_ENABLE_SPLIT_DNS` (optional): Enable split DNS functionality (default: false)
 - `TS_TAILNET` (optional): Your Tailscale organization name (e.g., `mydomain.com` or `name@mydomain.com`). If not set, uses "-" for default tailnet
 - `TS_HOSTS_FILE` (optional): Path to hosts file for custom DNS entries (default: /etc/ts-dns/hosts/custom_hosts)
+- `TS_REWRITE_FILE` (optional): Path to rewrite rules file (default: /etc/ts-dns/rewrite/rewrite.conf)
 - `TS_FORWARD_TO` (optional): Forward server for unresolved queries (default: /etc/resolv.conf)
 - `TS_EPHEMERAL` (optional): Enable ephemeral mode for Tailscale (default: true). When set to true, the node will be automatically removed when it goes offline and the service will logout on shutdown
 - `TSC_REFRESH_INTERVAL` (optional): Refresh interval in seconds (default: 30)
@@ -214,6 +238,8 @@ The plugin uses `/etc/ts-dns/` as the base directory for configuration files:
 /etc/ts-dns/
 ├── hosts/
 │   └── custom_hosts          # Custom DNS entries (hosts file format)
+├── rewrite/
+│   └── rewrite.conf          # Rewrite rules for CoreDNS rewrite plugin
 └── additional/
     └── additional.conf       # Additional CoreDNS configuration for plugins
 ```
@@ -221,6 +247,7 @@ The plugin uses `/etc/ts-dns/` as the base directory for configuration files:
 ### Volume Mounts
 
 - `/etc/ts-dns/hosts/custom_hosts` (optional): Custom hosts file for DNS entries
+- `/etc/ts-dns/rewrite/rewrite.conf` (optional): Rewrite rules file for CoreDNS rewrite plugin
 - `/etc/ts-dns/additional/additional.conf` (optional): Additional CoreDNS configuration for built-in plugins like route53, etcd, kubernetes
 
 ### Corefile Configuration
@@ -233,6 +260,7 @@ The plugin supports a simple Corefile configuration:
     hosts /etc/ts-dns/hosts/custom_hosts {
         fallthrough
     }
+    rewrite name www.mydomain.com mydomain.com
     forward . 8.8.8.8
     log
     errors

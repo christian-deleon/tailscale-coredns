@@ -20,6 +20,7 @@ type Config struct {
 	Hostname    string
 	HostsFile   string
 	ForwardTo   string
+	RewriteFile string
 
 	// Split DNS settings
 	EnableSplitDNS bool
@@ -85,6 +86,9 @@ func LoadFromEnv() (*Config, error) {
 	if config.ForwardTo == "" {
 		config.ForwardTo = "/etc/resolv.conf"
 	}
+
+	// Optional: Rewrite file
+	config.RewriteFile = os.Getenv("TS_REWRITE_FILE")
 
 	// Optional: Split DNS
 	config.EnableSplitDNS = strings.ToLower(os.Getenv("TS_ENABLE_SPLIT_DNS")) == "true"
@@ -160,6 +164,11 @@ func (c *Config) Validate() error {
 	// Validate hosts file exists if specified
 	if c.HostsFile != "" && !fileExists(c.HostsFile) {
 		return fmt.Errorf("hosts file does not exist: %s", c.HostsFile)
+	}
+
+	// Validate rewrite file exists if specified
+	if c.RewriteFile != "" && !fileExists(c.RewriteFile) {
+		return fmt.Errorf("rewrite file does not exist: %s", c.RewriteFile)
 	}
 
 	return nil

@@ -61,6 +61,9 @@ func main() {
 	log.Printf("  Ephemeral: %t", cfg.Ephemeral)
 	log.Printf("  Hosts file: %s", cfg.HostsFile)
 	log.Printf("  Forward to: %s", cfg.ForwardTo)
+	if cfg.RewriteFile != "" {
+		log.Printf("  Rewrite file: %s", cfg.RewriteFile)
+	}
 	log.Printf("  Refresh interval: %d seconds", cfg.RefreshInterval)
 
 	// Generate Corefile
@@ -165,6 +168,7 @@ Environment Variables:
   TS_ENABLE_SPLIT_DNS  Enable split DNS management (default: false)
   TS_TAILNET           Explicit tailnet name (optional, uses "-" for default if not set)
   TS_HOSTS_FILE        Path to custom hosts file (optional)
+  TS_REWRITE_FILE      Path to rewrite rules file (optional)
   TS_FORWARD_TO        Forward server for unresolved queries (default: /etc/resolv.conf)
   TS_EPHEMERAL         Enable ephemeral mode (default: true)
   TSC_REFRESH_INTERVAL Refresh interval in seconds (default: 30)

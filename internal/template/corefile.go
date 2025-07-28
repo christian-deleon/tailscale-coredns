@@ -16,6 +16,9 @@ const corefileTemplate = `. {
         fallthrough
     }
 {{- end }}
+{{- if .RewriteRules }}
+	{{ .RewriteRules }}
+{{- end }}
 {{- if .ForwardTo }}
     forward . {{ .ForwardTo }}
 {{- end }}
@@ -32,6 +35,7 @@ type CorefileData struct {
 	DomainsString    string
 	HostsFile        string
 	ForwardTo        string
+	RewriteRules     string
 	AdditionalConfig string
 }
 
@@ -56,11 +60,22 @@ func NewGenerator() (*Generator, error) {
 func (g *Generator) GenerateCorefile(cfg *config.Config) (string, error) {
 	// Join domains with spaces for the tailscale plugin line
 	domainsString := strings.Join(cfg.Domains, " ")
-	
+
+	// Load rewrite rules if rewrite file is specified
+	var rewriteRules string
+	if cfg.RewriteFile != "" {
+		loadedRules, err := LoadRewriteRules(cfg.RewriteFile)
+		if err != nil {
+			return "", fmt.Errorf("failed to load rewrite rules: %w", err)
+		}
+		rewriteRules = loadedRules
+	}
+
 	data := CorefileData{
 		DomainsString:    domainsString,
 		HostsFile:        cfg.HostsFile,
 		ForwardTo:        cfg.ForwardTo,
+		RewriteRules:     strings.TrimSpace(rewriteRules),
 		AdditionalConfig: strings.TrimSpace(cfg.AdditionalConfig),
 	}
 
@@ -120,4 +135,42 @@ func LoadAdditionalConfig(path string) (string, error) {
 	}
 
 	return strings.Join(filteredLines, "\n"), nil
+}
+
+// LoadRewriteRules loads rewrite rules from file if it exists
+func LoadRewriteRules(path string) (string, error) {
+	// Check if file exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return "", nil // File doesn't exist, return empty string
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to read rewrite rules file %s: %w", path, err)
+	}
+
+	// Filter out commented lines and empty lines
+	lines := strings.Split(string(content), "\n")
+	var filteredLines []string
+
+	for _, line := range lines {
+		trimmedLine := strings.TrimSpace(line)
+		// Skip empty lines and lines that start with #
+		if trimmedLine != "" && !strings.HasPrefix(trimmedLine, "#") {
+			filteredLines = append(filteredLines, line)
+		}
+	}
+
+	// If no non-commented content, return empty string
+	if len(filteredLines) == 0 {
+		return "", nil
+	}
+
+	// Convert each line to a rewrite plugin directive
+	var rewriteLines []string
+	for _, line := range filteredLines {
+		rewriteLines = append(rewriteLines, "    rewrite "+line)
+	}
+
+	return strings.Join(rewriteLines, "\n"), nil
 }

@@ -49,7 +49,8 @@ RUN apk add --no-cache \
     /run/tailscale \
     /state \
     /etc/ts-dns/hosts \
-    /etc/ts-dns/additional
+    /etc/ts-dns/additional \
+    /etc/ts-dns/rewrite
 
 # Install Tailscale in a single layer
 ENV TAILSCALE_VERSION=1.84.0
