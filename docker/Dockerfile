@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # Install build dependencies and set working directory
 RUN apk add --no-cache git && \
@@ -36,7 +36,7 @@ RUN git clone https://github.com/coredns/coredns.git && \
     go build -o coredns .
 
 # Runtime stage
-FROM alpine:3.18
+FROM alpine:3.22
 
 # Install all packages and create directories in a single layer
 RUN apk add --no-cache \
